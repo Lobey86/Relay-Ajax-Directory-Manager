@@ -195,6 +195,11 @@ a.hot {
 	top:4px;
 	right:15px;
 }
+.newFolder{
+	position:absolute;
+	top:4px;
+	right:70px;
+}
 .add {
 	position:absolute;
 	top:4px;
@@ -422,8 +427,8 @@ span.virtual .del, span.virtual .ren, span.virtual .date, span.virtual .icon {di
 	background:rgb(131,165,199) !important;
 }
 .selected .link, .selected .note, .selected .date { color:white !important; }
-.selected .del, .selected .add { color:rgb(37,80,129); }
-.selected .del:hover, .selected .add:hover { color:rgb(0,30,60); }
+.selected .del, .selected .add, .selected .newFolder { color:rgb(37,80,129); }
+.selected .del:hover, .selected .add:hover, .selected .newFolder:hover { color:rgb(0,30,60); }
 
 span.open {background-image:none;}
 
