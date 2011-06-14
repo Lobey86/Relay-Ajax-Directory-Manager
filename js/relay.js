@@ -647,6 +647,9 @@ File.prototype = {
 	
 	unlink: function () {
 		if(this.readonly) return false;
+		
+		if(confirm('delete the file '+this.name+ '?')) {
+		
 			var params = $H({ relay: 'fileDelete', fileid: this.id });
 			var ajax = new Ajax.Request(FC.URL,{
 				onComplete: this.parentObject.nextChild(this),
@@ -654,8 +657,8 @@ File.prototype = {
 				method: 'post', 
 				parameters: params.toQueryString(), 
 				onFailure: function() { showError(ER.ajax); }
-			});
-		//}
+			}); 
+		}
 	},
 	
 	clearRename: function () {
