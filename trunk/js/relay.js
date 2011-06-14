@@ -1062,7 +1062,17 @@ Cart.prototype = {
 		Droppables.add('cart', { accept: 'file', hoverclass: 'hover', onDrop: this.add.bind(this) });
 	},
 	
+	
+	toggleCart: function(){		
+		Element.toggle('downloadcartclose');
+		Element.toggle('downloadcart');
+	},
+	
 	add: function (element) {
+		if( !Element.visible('downloadcartclose') ){
+			this.toggleCart();
+		}
+
 		var name = element.object.name;
 		var fileid = element.object.id;
 		for(var i=0; i < this.children.length; i++){
