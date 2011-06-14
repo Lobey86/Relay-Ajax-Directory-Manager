@@ -71,9 +71,18 @@ Directory.prototype = {
 		Element.addClassName(this.link, this.flag);
 		Element.addClassName(this.link, 'link');
 
+		// New Folder Element
+		this.newFolder = document.createElement('a');
+		this.newFolder.href = "javascript:go()" 
+		this.newFolder.style.display = "none";	
+		this.newFolder.title = "Create new subfolder "+this.name;
+		this.newFolder.innerHTML = "new folder";
+		Element.addClassName(this.newFolder, 'newFolder');
+
+		// Delete Folder Element
 		this.del = document.createElement('a');
 		this.del.href = "javascript:go()";
-		this.del.innerHTML = "delete";
+		this.del.innerHTML = "|&nbsp;&nbsp;delete";
 		this.del.style.display = "none";
 		Element.addClassName(this.del, 'del');
 		
@@ -90,13 +99,17 @@ Directory.prototype = {
 		this.span.ondblclick = this.openOrClose.bindAsEventListener(this);
 
 		!this.readonly ? this.del.onclick = this.unlink.bindAsEventListener(this) : null;
+		!this.readonly ? this.newFolder.onclick = newFolder.bindAsEventListener(this) : null;
+		
 		this.link.onselectstart = function() {return false; }
 		this.handle.appendChild(this.icon);
 		this.handle.appendChild(this.link);
 		this.span.appendChild(this.mark);
-		this.span.appendChild(this.handle);
+		this.span.appendChild(this.handle);		
 		
 		if(this.readonly) this.span.appendChild(this.note);
+		this.span.appendChild(this.newFolder);
+
 		if(!this.virtual && !this.readonly ) {
 			this.span.appendChild(this.del);
 		}
@@ -307,6 +320,7 @@ Directory.prototype = {
 		$('uploadPath').value = this.path;
 		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.path;
 		this.del.style.display = "block";
+		this.newFolder.style.display = "block";
 		if(FC.SELECTEDOBJECT != null && FC.SELECTEDOBJECT != this) FC.SELECTEDOBJECT.deselect(); 
 		window.onkeypress = this.select_handler.bindAsEventListener(this);
 		FC.SELECTEDOBJECT = this;		
@@ -342,6 +356,7 @@ Directory.prototype = {
 			this.timer = null;
 			window.onkeypress = null;
 			this.del.style.display = 'none';
+			this.newFolder.style.display = 'none';
 			Element.removeClassName(this.span, 'selected');
 			this.selected = false; 
 			this.clearRename();
@@ -523,6 +538,8 @@ File.prototype = {
 		this.dl.title = "Add "+this.name+" to the download queue";
 		this.dl.innerHTML = "add to cart";
 		Element.addClassName(this.dl, 'add');
+	
+
 	
 		this.del = document.createElement('a');
 		this.del.href = "javascript:go()"
@@ -823,6 +840,8 @@ function jumpTo(path) {
 
 function go() {}
 
+// folder create method
+// ===========================================================================
 function newFolder(){
 	if(FC.SELECTEDOBJECT == null) return false;
 	if(FC.SELECTEDOBJECT.type == 'file') c = FC.SELECTEDOBJECT.parentObject;
@@ -845,6 +864,8 @@ function newFolder(){
 uploadDestination = null
 
 function uploadAuth() {
+
+	
 	if(QFiles.length == 0) return false;
 	if(!FC.SELECTEDOBJECT) { return false;}
 	
@@ -1064,7 +1085,6 @@ Cart.prototype = {
 		this.confirm = $('emailconfirm');
 		Droppables.add('cart', { accept: 'file', hoverclass: 'hover', onDrop: this.add.bind(this) });
 	},
-	
 	
 	toggleCart: function(){		
 		Element.toggle('downloadcartclose');
