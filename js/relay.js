@@ -28,7 +28,7 @@ Directory.prototype = {
 		this.changed = false;
 		this.timer = null;
 		this.interval = 1000;
-		this.children = new Array();
+		this.children = new Array(); // Only contains file elements when open!
 		
 		this.path == '' ? this.isRoot = true : this.isRoot = false;
 		this.parentElement = parentElement;
@@ -71,21 +71,42 @@ Directory.prototype = {
 		Element.addClassName(this.link, this.flag);
 		Element.addClassName(this.link, 'link');
 
-		// New Folder Element
-		this.newFolder = document.createElement('a');
-		this.newFolder.href = "javascript:go()" 
-		this.newFolder.style.display = "none";	
-		this.newFolder.title = "Create new subfolder "+this.name;
-		this.newFolder.innerHTML = "new folder";
-		Element.addClassName(this.newFolder, 'newFolder');
-
-		// Delete Folder Element
-		this.del = document.createElement('a');
-		this.del.href = "javascript:go()";
-		this.del.innerHTML = "|&nbsp;&nbsp;delete";
-		this.del.style.display = "none";
-		Element.addClassName(this.del, 'del');
+		// Drop Down
+		this.dropdown = document.createElement('select');
+		this.dropdown.style.display = "none";
 		
+		var selectAction = document.createElement('option');
+		selectAction.text = '-select action-';
+		selectAction.value = '';	
+		
+		var newFolderOpt = document.createElement('option')
+		newFolderOpt.text = 'New Folder'
+		newFolderOpt.value = 'newFolder'
+		
+		var downloadFolderOpt = document.createElement('option')
+		downloadFolderOpt.text = 'Add Folder to cart'
+		downloadFolderOpt.value = 'downloadFolder'
+
+		var renameFolderOpt = document.createElement('option')
+		renameFolderOpt.text = 'Rename Folder'
+		renameFolderOpt.value = 'renameFolder'
+		
+		var deleteFolderOpt = document.createElement('option')
+		deleteFolderOpt.text = 'Delete Folder'
+		deleteFolderOpt.value = 'deleteFolder'
+		
+		this.dropdown.options.add( selectAction );		
+		this.dropdown.options.add( downloadFolderOpt )
+		if(!this.readonly ) {
+			this.dropdown.options.add( newFolderOpt );
+			this.dropdown.options.add( renameFolderOpt );
+			if(!this.virtual){
+				this.dropdown.options.add( deleteFolderOpt )
+			}		
+		}
+		Element.addClassName(this.dropdown, 'dropdown');
+		
+		// Note
 		this.note = document.createElement('span');
 		this.note.innerHTML = '(read-only)';
 		Element.addClassName(this.note, 'note');
@@ -97,9 +118,7 @@ Directory.prototype = {
 		this.span.onmousedown = this.select.bindAsEventListener(this);
 		this.link.onmousedown = this.select.bindAsEventListener(this);
 		this.span.ondblclick = this.openOrClose.bindAsEventListener(this);
-
-		!this.readonly ? this.del.onclick = this.unlink.bindAsEventListener(this) : null;
-		!this.readonly ? this.newFolder.onclick = newFolder.bindAsEventListener(this) : null;
+		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this);
 		
 		this.link.onselectstart = function() {return false; }
 		this.handle.appendChild(this.icon);
@@ -107,12 +126,11 @@ Directory.prototype = {
 		this.span.appendChild(this.mark);
 		this.span.appendChild(this.handle);		
 		
+		
+		this.span.appendChild(this.dropdown)
+		
 		if(this.readonly) this.span.appendChild(this.note);
-		this.span.appendChild(this.newFolder);
 
-		if(!this.virtual && !this.readonly ) {
-			this.span.appendChild(this.del);
-		}
 		this.span.appendChild(this.spinner);
 		this.element.appendChild(this.span);
 				
@@ -138,7 +156,91 @@ Directory.prototype = {
 		}
 		
 	 },
-	 
+	
+	
+	/*
+		Adds all files, including those in subdirectories to download cart.
+	*/
+	addDL: function(folderPath){
+		
+		/*
+			Fetch will recursively call itself when it finds a directory.
+		*/		
+		function fetch(folderPath){
+			var params = $H({ relay: 'getFolder', path: folderPath });
+		
+			var ajax = new Ajax.Request(FC.URL, {
+				onSuccess: function(response){
+
+					var json_data = response.responseText;
+					eval("var jsonObject = ("+json_data+")");
+					
+					for(var i=0; i<jsonObject.bindings.length; i++){
+						var item = jsonObject.bindings[i];
+										
+						if(item.type === 'file'){							
+							cart.addSpecial(item.id, item.name) 
+						}else if(item.type === 'directory'){
+							fetch(item.path)
+						}
+					};
+		
+				},
+				method: 'post', 
+				parameters: params.toQueryString(), 
+				onFailure: function() { 
+					showError(ER.ajax); 
+				}
+			});
+		}
+		fetch(folderPath);
+	},
+	
+	actionSelect: function (e){
+		var selectionIndex = e.originalTarget.options.selectedIndex
+		var selectionValue = e.originalTarget.options[selectionIndex].value
+		
+		switch(selectionValue){
+			case 'newFolder':
+				if(!this.readonly){
+					newFolder(this);
+				}else{
+					alert('Folder is read-only!');
+				}
+				break;
+			
+			case 'downloadFolder':
+				this.addDL(this.path);
+				break;
+				
+			case 'renameFolder':
+				if(!this.readonly){
+					var newName = prompt('Rename folder ' + this.name + ' to:')
+					if(newName){
+						this.rename_handler('',cleanseFilename( newName) )
+					}
+				}else{
+					alert('Folder is read-only!');
+				}
+				break;
+				
+			case 'deleteFolder':
+				if(!this.readonly){
+					this.unlink();
+				}else{
+					alert('Folder is read-only!');
+				}
+				break;
+		};
+		
+		this.resetDropDown();
+	},
+		
+	resetDropDown: function (e){
+		var options = this.dropdown.options;
+		options[0].selected = true;
+	},
+	
 	getContents: function () {
 		if(this.opening) return false;
 		this.opening = true;
@@ -154,6 +256,7 @@ Directory.prototype = {
 	},
 
 	getContents_handler: function (response) {
+		
 		this.open = true;
 		Element.addClassName(this.span, 'open');
 		this.opening = false;
@@ -319,11 +422,14 @@ Directory.prototype = {
 	select: function (event) {
 		$('uploadPath').value = this.path;
 		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.path;
-		this.del.style.display = "block";
-		this.newFolder.style.display = "block";
+		// this.del.style.display = "block";
+		// this.newFolder.style.display = "block";
+		this.dropdown.style.display = "block";
 		if(FC.SELECTEDOBJECT != null && FC.SELECTEDOBJECT != this) FC.SELECTEDOBJECT.deselect(); 
 		window.onkeypress = this.select_handler.bindAsEventListener(this);
-		FC.SELECTEDOBJECT = this;		
+		FC.SELECTEDOBJECT = this;
+				
+		//Element.addClassName(this.element, 'selected');		
 		Element.addClassName(this.span, 'selected');
 		
 		if ($('meta').prevElement != this.path ) this.getMeta();
@@ -355,9 +461,10 @@ Directory.prototype = {
 	deselect: function () {
 			this.timer = null;
 			window.onkeypress = null;
-			this.del.style.display = 'none';
-			this.newFolder.style.display = 'none';
+			this.dropdown.style.display = "none";
 			Element.removeClassName(this.span, 'selected');
+			//Element.removeClassName(this.element, 'selected');		
+			
 			this.selected = false; 
 			this.clearRename();
 	},
@@ -463,7 +570,7 @@ Directory.prototype = {
 	unlink: function () {
 		if(this.readonly) return false;
 		if(this.virtual) return false;
-		if(confirm('delete the folder '+this.name+ '?')) {
+		if(confirm('Delete the folder '+this.name+ '?')) {
 			var params = $H({ relay: 'folderDelete', folder: this.path });
 			this.parentObject.prevChild(this);
 			var ajax = new Ajax.Request(FC.URL,{
@@ -498,6 +605,7 @@ var File = Class.create();
 File.prototype = {
 	
 	initialize: function (id, name, flag, parentElement, date) {
+		
 		this.type = 'file';
 		this.fileDate = date;
 		this.name = name;
@@ -514,6 +622,7 @@ File.prototype = {
 	},
 	
 	createFile: function () { 
+						
 		this.element = document.createElement('div');
 		this.span =    document.createElement('span');
 		this.link =    document.createElement('a');
@@ -532,38 +641,46 @@ File.prototype = {
 		this.date.innerHTML = this.fileDate;
 		Element.addClassName(this.date, 'date');
 		
-		this.dl = document.createElement('a');
-		this.dl.href = "javascript:go()";
-		this.dl.style.display = "none";			
-		this.dl.title = "Add "+this.name+" to the download queue";
-		this.dl.innerHTML = "add to cart";
-		Element.addClassName(this.dl, 'add');
-	
-
-	
-		this.del = document.createElement('a');
-		this.del.href = "javascript:go()"
-		this.del.style.display = "none";			
-		this.del.title = "Delete "+this.name;
-		this.del.innerHTML = "|&nbsp;&nbsp;delete";
-		Element.addClassName(this.del, 'del');
-
+		// Drop Down
+		this.dropdown = document.createElement('select');
+		this.dropdown.style.display = "none";
+		
+		var selectAction = document.createElement('option');
+		selectAction.text = '-select action-';
+		selectAction.value = '';	
+		
+		var downloadFileOpt = document.createElement('option')
+		downloadFileOpt.text = 'Add to cart';
+		downloadFileOpt.value = 'downloadFile';
+		
+		var renameFileOpt = document.createElement('option')
+		renameFileOpt.text = 'Rename File';
+		renameFileOpt.value = 'renameFile';
+		
+		var deleteFileOpt = document.createElement('option')
+		deleteFileOpt.text = 'Delete File';
+		deleteFileOpt.value = 'deleteFile';
+		
+		this.dropdown.options.add( selectAction );		
+		this.dropdown.options.add( downloadFileOpt );
+		if(!this.readonly) {
+			this.dropdown.options.add( renameFileOpt );
+			this.dropdown.options.add( deleteFileOpt );
+		}
+		Element.addClassName(this.dropdown, 'dropdown');
+		
 		this.span.onmousedown = this.select.bind(this);
 		this.link.onmousedown = this.select.bindAsEventListener(this);
 		this.icon.onmousedown = this.select.bind(this);
 		this.link.ondblclick = this.download.bindAsEventListener(this);
 		this.icon.ondblclick = this.download.bindAsEventListener(this);
-		this.dl.onclick = this.addDl.bind(this);
-		this.del.onclick = this.unlink.bind(this);
+		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this);
 	
 		this.handle.appendChild(this.icon);
 		this.handle.appendChild(this.link);
 		this.span.appendChild(this.handle);
 		this.span.appendChild(this.date);
-		if(!this.readonly) {
-			this.span.appendChild(this.del);
-		}
-		this.span.appendChild(this.dl);
+		this.span.appendChild(this.dropdown)
 		this.element.appendChild(this.span);
 		
 		this.search ? this.element.id = 'sid'+this.id : this.element.id = 'fid'+this.id;
@@ -574,6 +691,42 @@ File.prototype = {
 		!this.readonly ? new Draggable(this.element.id, {revert:true, handle:'handle'}) : null;
 
 	},
+	actionSelect: function (e){
+		var selectionIndex = e.originalTarget.options.selectedIndex
+		var selectionValue = e.originalTarget.options[selectionIndex].value
+		
+		switch(selectionValue){
+			case 'downloadFile':
+				this.addDl();
+				break;
+				
+			case 'renameFile':
+				if(!this.readonly){			
+					var newName = prompt('Rename folder ' + this.name + ' to:')
+					if(newName){
+						var description =  this.description || '';
+						saveMetaSpecial(this.id, this.type, newName, description, this.flag)
+					}
+				}
+				break;
+				
+			case 'deleteFile':
+				if(!this.readonly){
+					this.unlink();
+				}else{
+					alert('Folder is read-only!');
+				}
+				break;
+		};
+		
+		this.resetDropDown();
+	},
+	
+	resetDropDown: function (e){
+		var options = this.dropdown.options;
+		options[0].selected = true;
+	},
+	
 	appearTools: function () { Effect.Appear(this.del.id); },
 	fadeTools:   function () { this.del.style.display="none";  },
 	
@@ -592,8 +745,8 @@ File.prototype = {
 	select: function (ev) {
 		$('uploadPath').value = this.parentObject.path;
 		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.parentObject.path;
-		
-		this.del.style.display = this.dl.style.display = "block";
+		this.dropdown.style.display = "block";
+		// this.del.style.display = this.dl.style.display = "block";
 		if(FC.SELECTEDOBJECT != null && FC.SELECTEDOBJECT != this) FC.SELECTEDOBJECT.deselect(); 
 		window.onkeypress = this.select_handler.bindAsEventListener(this);
 		FC.SELECTEDOBJECT = this;
@@ -614,7 +767,9 @@ File.prototype = {
 	deselect: function () {
 			this.timer = null;
 			window.onkeypress = null;
-			this.del.style.display = this.dl.style.display ="none";
+			this.dropdown.style.display = "none";
+			
+			// this.del.style.display = this.dl.style.display ="none";
 			Element.removeClassName(this.span, 'selected');
 			this.selected = false; 
 			this.clearRename();
@@ -665,7 +820,7 @@ File.prototype = {
 	unlink: function () {
 		if(this.readonly) return false;
 		
-		if(confirm('delete the file '+this.name+ '?')) {
+		if(confirm('Delete the file '+this.name+ '?')) {
 		
 			var params = $H({ relay: 'fileDelete', fileid: this.id });
 			var ajax = new Ajax.Request(FC.URL,{
@@ -734,7 +889,11 @@ File.prototype = {
 
 
 // NON OBJECT METHODS
+// ===========================================================================
 
+function cleanseFilename(string){
+	return string.replace(/[\[\],\/\\#!$%\^&\'"*;:{}=\`~()]/g,"");
+}
 
 updateMeta = function (meta) {
 	meta = $H(meta);
@@ -761,15 +920,14 @@ updateMeta = function (meta) {
 	}
 }
 
-
-
 saveMeta = function () {
+
 	if(FC.SELECTEDOBJECT.type == 'directory') {
-		FC.SELECTEDOBJECT.rename_handler("", $('folderMeta').value);
+		FC.SELECTEDOBJECT.rename_handler("", cleanseFilename( $('folderMeta').value ) );
 		return false;
 	}
 	
-	var metaFilename = $('metaFilename').value;
+	var metaFilename = cleanseFilename( $('metaFilename').value );
 	var metaFlag = $('metaFlag').options[$('metaFlag').selectedIndex].value;
 	var metaDesc = $('metaDesc').value;
 	
@@ -785,6 +943,44 @@ saveMeta = function () {
 		onFailure: function() { showError(ER.ajax); }
 	});
 }
+
+/*
+	SaveMeta needs to be refactored! saveMetaSpecial is in lue of that, and 
+	follows the existing "convention" of cart.addSpecial() of creating a 
+	duplicate function that accepts values vice being coupled to the UI.
+*/
+function saveMetaSpecial(fileID, fileType, fileName, fileDescr, fileFlag){
+	
+	fileName = cleanseFilename(fileName);
+	
+	if(fileType === 'directory'){
+		FC.SELECTEDOBJECT.rename_handler(null, fileName);
+		return false;
+	}
+	
+	FC.SELECTEDOBJECT.name = fileName;
+	FC.SELECTEDOBJECT.flag = fileFlag;
+	
+	var params = $H({
+		relay: 'setMeta', 
+		fileid: fileID, 
+		filename: fileName, 
+		description: fileDescr, 
+		flags: fileFlag 
+	});
+	
+	var ajax = new Ajax.Request(FC.URL, {
+		onSuccess: FC.SELECTEDOBJECT.refresh.bind(FC.SELECTEDOBJECT),
+		method: 'post', 
+		parameters: params.toQueryString(), 
+		onFailure: function() { 
+			console.log(ER.ajax);
+			showError(ER.ajax); 
+		}
+	});
+};
+
+
 function showMetaSpinner () { $('meta').innerHTML = '<div style="border-bottom:0;" class="thumbbox"><img src="'+spinnerIcon+'" alt="" /></div>'; }
 
 function parsePath(searchPath) {
@@ -1095,18 +1291,18 @@ Cart.prototype = {
 		if( !Element.visible('downloadcartclose') ){
 			this.toggleCart();
 		}
-
+	
 		var name = element.object.name;
 		var fileid = element.object.id;
 		for(var i=0; i < this.children.length; i++){
 			if(fileid == this.children[i]) { return false; }
 		}
-
+	
 		row = document.createElement('div');
 		row.id = 'c'+fileid;
 		row.innerHTML = '<div>'+name+'</div>';
 		row.innerHTML += '<a href="#" onclick="cart.remove(\''+fileid+'\'); return false" class="remove"></a>';
-
+	
 		this.element.appendChild(row);
 		this.children[this.children.length] = fileid;
 		
