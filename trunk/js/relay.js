@@ -650,8 +650,12 @@ File.prototype = {
 		selectAction.value = '';	
 		
 		var downloadFileOpt = document.createElement('option')
-		downloadFileOpt.text = 'Add to cart';
+		downloadFileOpt.text = 'Download this file';
 		downloadFileOpt.value = 'downloadFile';
+
+		var addFiletoCartOpt = document.createElement('option')
+		addFiletoCartOpt.text = 'Add to cart';
+		addFiletoCartOpt.value = 'addFiletoCart';
 		
 		var renameFileOpt = document.createElement('option')
 		renameFileOpt.text = 'Rename File';
@@ -663,6 +667,7 @@ File.prototype = {
 		
 		this.dropdown.options.add( selectAction );		
 		this.dropdown.options.add( downloadFileOpt );
+		this.dropdown.options.add( addFiletoCartOpt );
 		if(!this.readonly) {
 			this.dropdown.options.add( renameFileOpt );
 			this.dropdown.options.add( deleteFileOpt );
@@ -696,8 +701,12 @@ File.prototype = {
 		var selectionValue = e.originalTarget.options[selectionIndex].value
 		
 		switch(selectionValue){
-			case 'downloadFile':
+			case 'addFiletoCart':
 				this.addDl();
+				break;
+			
+			case 'downloadFile':
+				location.href = FC.URL+'?relay=getFilePackage&fileid=' + this.id
 				break;
 				
 			case 'renameFile':
@@ -1338,7 +1347,6 @@ Cart.prototype = {
 			this.email(cartIDs);
 		else
 			location.href = FC.URL+'?relay=getFilePackage&fileid=' + cartIDs;
-			
 	},
 	
 	email: function(cartIDs) {
