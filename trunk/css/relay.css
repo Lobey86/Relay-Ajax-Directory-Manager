@@ -139,16 +139,24 @@ a.hot {
 	margin-left:15px;
 }
 .directory { 	border:2px solid white; }
-.directory>span { background:url(../images/folder_bg.gif) top left repeat-x; }
+.directory>span { 
+	background:url(../images/folder_bg.gif) top left repeat-x; 
+	background-position:0px, 6px;
+}
 .file {
 	margin-top:2px;
 	margin-bottom:2px;
 }
+
+
+
 .directory span, .file span {
 	display:block;
-	height:20px;
+	height:26px;
 	position:relative;
 }
+
+
 .blank {
 	margin-left:75px;
 	color:#999;
@@ -189,6 +197,11 @@ a.hot {
 	padding:3px 0 1px 2px;
 	border:0;
 	background:white;
+}
+.dropdown{
+	position:absolute;
+	top:4px;
+	right:15px;	
 }
 .del {
 	position:absolute;
@@ -423,6 +436,11 @@ span.virtual .del, span.virtual .ren, span.virtual .date, span.virtual .icon {di
 .selected, .selected .link { 
 	background:rgb(131,165,199) !important;
 }
+
+
+
+
+
 .hover>span, .hover>span .link { 
 	background:rgb(131,165,199) !important;
 }
