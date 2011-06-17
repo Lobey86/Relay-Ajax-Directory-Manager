@@ -72,7 +72,7 @@ div#dashboard {
 <body>
 
 <div id="head">
-	<a href="http://www.ecosmear.com/relay/"><img src="images/relaybeta.gif" class="logo" alt="Relay Beta" /></a>
+	<img src="images/relaybeta.gif" class="logo" alt="Relay Beta" />
 	<div id="logout"></div>
 	<div id="nav">
 		<form onsubmit="search.start(); return false">
@@ -162,8 +162,21 @@ div#dashboard {
 </div>
 <div id="filesystem">
 	<div id="searcharea"></div>
-	<div id="fileList"></div>
+	<div id="fileList">
+	</div>
+	
+	<div style="clear:both"></div>
+	
+	<div id="massActionBar">
+		<button id="massDelete" type="button">Delete</button>
+		<button id="massAdd" type="button">Add to Cart</button>
+		
+		<!-- <select id="massMove">
+			<option value="">Move to</option>
+		</select> -->
+	</div>
 </div>
+
 
 <div id="login" style="display:none">
 	<img src="images/login_bg.png" alt="" class="bg" />

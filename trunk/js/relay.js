@@ -13,6 +13,10 @@ var FC = {
 	DEBUG:false
 };
 
+/*
+	TODO: Directory and File should be subclasses of the same class since 
+	they share so much similary functionality.
+*/
 var Directory = Class.create();
 Directory.prototype = {
 
@@ -25,7 +29,7 @@ Directory.prototype = {
 		this.virtual = virtual || false;
 		this.open = false;
 		this.selected = false;
-		this.changed = false;
+		this.changed = false; 
 		this.timer = null;
 		this.interval = 1000;
 		this.children = new Array(); // Only contains file elements when open!
@@ -54,6 +58,9 @@ Directory.prototype = {
 		this.spinner.src = spinnerIcon;
 		this.spinner.style.display="none";
 		Element.addClassName(this.spinner, 'spinner');
+		
+		this.checkbox = document.createElement('input');
+		this.checkbox.type = 'checkbox';
 		
 		this.span =    document.createElement('span');
 		this.icon.src = folderIcon;
@@ -112,6 +119,10 @@ Directory.prototype = {
 		Element.addClassName(this.note, 'note');
 
 		// Events
+		/*
+			TODO: Attaching event handlers to every object is inefficient. 
+			Event delegation should be used instead.
+		*/
 		this.mark.onclick = this.openOrClose.bindAsEventListener(this);			
 		this.icon.onmousedown = this.select.bindAsEventListener(this);
 		this.icon.ondblclick = this.openOrClose.bindAsEventListener(this);
@@ -119,13 +130,19 @@ Directory.prototype = {
 		this.link.onmousedown = this.select.bindAsEventListener(this);
 		this.span.ondblclick = this.openOrClose.bindAsEventListener(this);
 		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this);
+		this.checkbox.onchange = this.checkbox_handler.bindAsEventListener(this);
 		
 		this.link.onselectstart = function() {return false; }
 		this.handle.appendChild(this.icon);
 		this.handle.appendChild(this.link);
 		this.span.appendChild(this.mark);
-		this.span.appendChild(this.handle);		
+		this.span.appendChild(this.handle);	
 		
+		console.log(this.isRoot)
+		
+		if(!this.isRoot && !this.readonly && !this.virtual){
+			this.span.appendChild(this.checkbox);			
+		}
 		
 		this.span.appendChild(this.dropdown)
 		
@@ -157,11 +174,27 @@ Directory.prototype = {
 		
 	 },
 	
+	check:function(){
+		this.checkbox.checked = true;
+	},
+	unCheck:function(){
+		this.checkbox.checked = false;
+	},
+	
+	checkbox_handler: function(){
+		var checked = this.checkbox.checked;
+
+		if(checked){
+			addCheckedFile(this);
+		}else{
+			removeCheckedfile(this);
+		}
+	},
 	
 	/*
 		Adds all files, including those in subdirectories to download cart.
 	*/
-	addDL: function(folderPath){
+	addDl: function(folderPath){
 		
 		/*
 			Fetch will recursively call itself when it finds a directory.
@@ -210,7 +243,7 @@ Directory.prototype = {
 				break;
 			
 			case 'downloadFolder':
-				this.addDL(this.path);
+				this.addDl(this.path);
 				break;
 				
 			case 'renameFolder':
@@ -366,10 +399,20 @@ Directory.prototype = {
 	addChild:  function (child) {
 		if (child.type == 'file') {
 			var newFile = new File(child.id, child.name, child.flags, this.element, child.date);
+			
+			if( isChecked(newFile) ){
+				newFile.checkbox.checked = true;
+			}
+
 			this.children.push(newFile);
 		}
 		else if(child.type == 'directory') {
 			var newDir = new Directory(child.path, child.name, child.flags, this.element, child.virtual, child.scheme, child.displayname);			
+
+			if( isChecked(newDir) ){
+				newDir.checkbox.checked = true;
+			}
+
 			this.children.push(newDir);
 		}
 		else return 0;
@@ -568,6 +611,9 @@ Directory.prototype = {
 	},
 	
 	unlink: function () {
+		
+		console.log('unlink called')
+		
 		if(this.readonly) return false;
 		if(this.virtual) return false;
 		if(confirm('Delete the folder '+this.name+ '?')) {
@@ -629,7 +675,11 @@ File.prototype = {
 		this.icon = document.createElement('img');
 		this.handle = document.createElement('div');
 		Element.addClassName(this.handle, 'handle');
-				
+		
+		this.checkbox = document.createElement('input');
+		this.checkbox.type = 'checkbox';
+		Element.addClassName(this.checkbox, 'fileCheckbox')
+		
 		this.flag != 'normal' ? this.icon.src = "images/"+this.flag+".png" : this.icon.src= fileIcon;
 		Element.addClassName(this.icon, 'icon');
 		this.link.title = this.id;
@@ -654,7 +704,7 @@ File.prototype = {
 		downloadFileOpt.value = 'downloadFile';
 
 		var addFiletoCartOpt = document.createElement('option')
-		addFiletoCartOpt.text = 'Add to cart';
+		addFiletoCartOpt.text = 'Add file to cart';
 		addFiletoCartOpt.value = 'addFiletoCart';
 		
 		var renameFileOpt = document.createElement('option')
@@ -674,13 +724,19 @@ File.prototype = {
 		}
 		Element.addClassName(this.dropdown, 'dropdown');
 		
+		/*
+			TODO: Attaching event handlers to every object is inefficient. 
+			Event delegation should be used instead.
+		*/
 		this.span.onmousedown = this.select.bind(this);
 		this.link.onmousedown = this.select.bindAsEventListener(this);
 		this.icon.onmousedown = this.select.bind(this);
 		this.link.ondblclick = this.download.bindAsEventListener(this);
 		this.icon.ondblclick = this.download.bindAsEventListener(this);
 		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this);
+		this.checkbox.onchange = this.checkbox_handler.bindAsEventListener(this);
 	
+		this.handle.appendChild(this.checkbox)
 		this.handle.appendChild(this.icon);
 		this.handle.appendChild(this.link);
 		this.span.appendChild(this.handle);
@@ -696,6 +752,22 @@ File.prototype = {
 		!this.readonly ? new Draggable(this.element.id, {revert:true, handle:'handle'}) : null;
 
 	},
+	check:function(){
+		this.checkbox.checked = true;
+	},
+	unCheck:function(){
+		this.checkbox.checked = false;
+	},
+	checkbox_handler: function(){
+		var checked = this.checkbox.checked;
+		
+		if(checked){
+			addCheckedFile(this);
+		}else{
+			removeCheckedfile(this);
+		}
+	},
+	
 	actionSelect: function (e){
 		var selectionIndex = e.originalTarget.options.selectedIndex
 		var selectionValue = e.originalTarget.options[selectionIndex].value
@@ -714,7 +786,7 @@ File.prototype = {
 					var newName = prompt('Rename folder ' + this.name + ' to:')
 					if(newName){
 						var description =  this.description || '';
-						saveMetaSpecial(this.id, this.type, newName, description, this.flag)
+						saveMetaSpecial(this.id, this.type, cleanseFilename(newName), description, this.flag)
 					}
 				}
 				break;
@@ -897,11 +969,14 @@ File.prototype = {
 };
 
 
+
+
+
 // NON OBJECT METHODS
 // ===========================================================================
 
 function cleanseFilename(string){
-	return string.replace(/[\[\],\/\\#!$%\^&\'"*;:{}=\`~()]/g,"");
+	return string.replace(/['";{}]/g,"");
 }
 
 updateMeta = function (meta) {
@@ -960,7 +1035,7 @@ saveMeta = function () {
 */
 function saveMetaSpecial(fileID, fileType, fileName, fileDescr, fileFlag){
 	
-	fileName = cleanseFilename(fileName);
+	//fileName = cleanseFilename(fileName); 
 	
 	if(fileType === 'directory'){
 		FC.SELECTEDOBJECT.rename_handler(null, fileName);
@@ -983,7 +1058,6 @@ function saveMetaSpecial(fileID, fileType, fileName, fileDescr, fileFlag){
 		method: 'post', 
 		parameters: params.toQueryString(), 
 		onFailure: function() { 
-			console.log(ER.ajax);
 			showError(ER.ajax); 
 		}
 	});
@@ -1434,7 +1508,99 @@ search = null;
 cart = null;
 root = null;
 
-windowLoader = function () {
+// Mass Action
+// ===========================================================================
+
+var checkedFiles = []; // file ID's or directory ID's ""
+
+function addCheckedFile(file){
+	for(var i=0; i< checkedFiles.length; i++){
+		if(checkedFiles[i].id === file.id){
+			return;
+		};
+	};
+	
+	checkedFiles.push(file);
+};
+function removeCheckedfile(file){
+	for(var i=0; i< checkedFiles.length; i++){
+		if(checkedFiles[i].id === file.id){				
+			checkedFiles.splice(i,1);
+		};
+	};
+};
+function isChecked(file){
+	for(var i=0; i< checkedFiles.length; i++){
+		if(checkedFiles[i].id === file.id){				
+			return true;
+		};
+	};
+	
+	return false;
+};
+
+function unCheckAll(){
+	for(var i=0; i< checkedFiles.length; i++){
+		checkedFiles[i].unCheck();	
+	};			
+};
+
+
+function getRoot(){
+	console.log(root)
+}
+
+function massAction(){
+
+	
+
+	function massCleanUp(){
+		unCheckAll();
+	};
+	
+	function massAdd(){
+		for(var i=0; i<checkedFiles.length; i++){					
+			checkedFiles[i].addDl(checkedFiles[i].path);
+		};
+		massCleanUp();
+	};
+	
+	function massDelete(){
+		for(var i=0; i<checkedFiles.length; i++){			
+			checkedFiles[i].unlink();
+		};
+		
+		checkedFiles = {};	
+		massCleanUp();
+	};
+	
+	function massMove(){
+		var selectionIndex = $('massMove').options.selectedIndex;
+		var selectionValue = $('massMove').options[selectionIndex].value;
+		
+		
+		
+		massCleanUp();
+		var options = $('massMove').options;
+		options[0].selected = true;
+	};
+	
+
+	$('massDelete').onclick = massDelete.bindAsEventListener(this);
+	$('massAdd').onclick = massAdd.bindAsEventListener(this);
+	$('massMove').onchange = massMove.bindAsEventListener(this);
+};
+
+// ===========================================================================
+
+
+
+
+
+
+
+
+windowLoader = function () { 
 	root = new Directory('', '', false, $('fileList'));
 	
 	root.getContents();
@@ -1448,6 +1614,8 @@ windowLoader = function () {
 	//Field.activate('searchbar');
 	
 	var ajax = new Ajax.Request('relay.php', {onSuccess: userLogin_handler_check, method: 'post', parameters: 'relay=checkLogin'});
+
+	massAction();
 }
 
 function userLogin_handler_check(response){      
