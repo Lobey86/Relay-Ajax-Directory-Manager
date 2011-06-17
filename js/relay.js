@@ -1580,7 +1580,7 @@ function massAction(){
 
 	$('massDelete').onclick = massDelete.bindAsEventListener(this);
 	$('massAdd').onclick = massAdd.bindAsEventListener(this);
-	$('massMove').onchange = massMove.bindAsEventListener(this);
+	// $('massMove').onchange = massMove.bindAsEventListener(this);
 };
 
 // ===========================================================================
