@@ -15,7 +15,7 @@ var FC = {
 
 /*
 	TODO: Directory and File should be subclasses of the same class since 
-	they share so much similary functionality.
+	they share so much similar functionality.
 */
 var Directory = Class.create();
 Directory.prototype = {
@@ -137,9 +137,7 @@ Directory.prototype = {
 		this.handle.appendChild(this.link);
 		this.span.appendChild(this.mark);
 		this.span.appendChild(this.handle);	
-		
-		console.log(this.isRoot)
-		
+				
 		if(!this.isRoot && !this.readonly && !this.virtual){
 			this.span.appendChild(this.checkbox);			
 		}
@@ -611,9 +609,7 @@ Directory.prototype = {
 	},
 	
 	unlink: function () {
-		
-		console.log('unlink called')
-		
+				
 		if(this.readonly) return false;
 		if(this.virtual) return false;
 		if(confirm('Delete the folder '+this.name+ '?')) {
@@ -1035,7 +1031,7 @@ saveMeta = function () {
 */
 function saveMetaSpecial(fileID, fileType, fileName, fileDescr, fileFlag){
 	
-	//fileName = cleanseFilename(fileName); 
+	fileName = cleanseFilename(fileName); 
 	
 	if(fileType === 'directory'){
 		FC.SELECTEDOBJECT.rename_handler(null, fileName);
@@ -1545,10 +1541,6 @@ function unCheckAll(){
 	};			
 };
 
-
-function getRoot(){
-	console.log(root)
-}
 
 function massAction(){
 
