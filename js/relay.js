@@ -13,13 +13,11 @@ var FC = {
 	DEBUG:false
 };
 
-/*
-	TODO: Directory and File should be subclasses of the same class since 
-	they share so much similar functionality.
-*/
+// TODO: Directory and File should *ideally* be subclasses of the same class 
+// since they share so much similar functionality.
 var Directory = Class.create();
 Directory.prototype = {
-
+	
 	initialize: function (path, name, flag, parentElement, virtual, scheme, displayname) {
 		this.path = path;
 		this.type = 'directory';
@@ -62,7 +60,7 @@ Directory.prototype = {
 		this.checkbox = document.createElement('input');
 		this.checkbox.type = 'checkbox';
 		
-		this.span =    document.createElement('span');
+		this.span = document.createElement('span');
 		this.icon.src = folderIcon;
 		Element.addClassName(this.icon, 'icon');
 		
@@ -81,10 +79,11 @@ Directory.prototype = {
 		// Drop Down
 		this.dropdown = document.createElement('select');
 		this.dropdown.style.display = "none";
+		this.dropdown.name = 'action'
 		
 		var selectAction = document.createElement('option');
 		selectAction.text = '-select action-';
-		selectAction.value = '';	
+		selectAction.value = 'null';
 		
 		var newFolderOpt = document.createElement('option')
 		newFolderOpt.text = 'New Folder'
@@ -119,38 +118,37 @@ Directory.prototype = {
 		Element.addClassName(this.note, 'note');
 
 		// Events
-		/*
-			TODO: Attaching event handlers to every object is inefficient. 
-			Event delegation should be used instead.
-		*/
+		//
+		// TODO: Attaching event handlers to every object is inefficient. 
+		// Event delegation should be used instead.
 		this.mark.onclick = this.openOrClose.bindAsEventListener(this);			
 		this.icon.onmousedown = this.select.bindAsEventListener(this);
 		this.icon.ondblclick = this.openOrClose.bindAsEventListener(this);
-		this.span.onmousedown = this.select.bindAsEventListener(this);
 		this.link.onmousedown = this.select.bindAsEventListener(this);
 		this.span.ondblclick = this.openOrClose.bindAsEventListener(this);
-		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this);
+		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this); 
+		this.span.onmousedown = this.select.bindAsEventListener(this);
 		this.checkbox.onchange = this.checkbox_handler.bindAsEventListener(this);
 		
 		this.link.onselectstart = function() {return false; }
 		this.handle.appendChild(this.icon);
 		this.handle.appendChild(this.link);
 		this.span.appendChild(this.mark);
-		this.span.appendChild(this.handle);	
-				
+		this.span.appendChild(this.handle);			
 		if(!this.isRoot && !this.readonly && !this.virtual){
 			this.span.appendChild(this.checkbox);			
-		}
-		
+		};
 		this.span.appendChild(this.dropdown)
-		
-		if(this.readonly) this.span.appendChild(this.note);
-
+		if(this.readonly){
+			this.span.appendChild(this.note);
+		};
 		this.span.appendChild(this.spinner);
 		this.element.appendChild(this.span);
 				
-		if (this.isRoot) this.span.style.display = "none";
-		
+		if (this.isRoot){
+			this.span.style.display = "none";
+		};
+
 		this.element.id = "root" + this.id;
 		this.element.object = this;
 		
@@ -158,23 +156,28 @@ Directory.prototype = {
 		if(this.virtual) {
 			Element.addClassName(this.element, 'virtual');
 			Element.addClassName(this.span, 'virtual');
-		}
+		};
 		if(this.readonly) {
 			Element.addClassName(this.element, 'read');
 			Element.addClassName(this.span, 'read');
-		}				
+		};
 		this.parentElement.appendChild(this.element);	
 		if(!this.isRoot && !this.readonly){
 			if(!this.virtual) new Draggable(this.element.id, {revert:true, handle:'handle'});
 			Droppables.add(this.element.id, { accept: FC.TYPES, hoverclass: 'hover', onDrop: this.moveTo.bind(this) });
 			this.resetHierarchy();
-		}
+		};
 		
 	 },
+	
+	// checkbox_stopEvent: function(event){
+	// 	Event.stop(event);
+	// },
 	
 	check:function(){
 		this.checkbox.checked = true;
 	},
+	
 	unCheck:function(){
 		this.checkbox.checked = false;
 	},
@@ -189,20 +192,17 @@ Directory.prototype = {
 		}
 	},
 	
-	/*
-		Adds all files, including those in subdirectories to download cart.
-	*/
+
+	// Adds all files, including those in subdirectories to download cart.
 	addDl: function(folderPath){
-		
-		/*
-			Fetch will recursively call itself when it finds a directory.
-		*/		
+
+		// Fetch will recursively call itself when it finds a directory.	
 		function fetch(folderPath){
 			var params = $H({ relay: 'getFolder', path: folderPath });
 		
 			var ajax = new Ajax.Request(FC.URL, {
+				
 				onSuccess: function(response){
-
 					var json_data = response.responseText;
 					eval("var jsonObject = ("+json_data+")");
 					
@@ -210,12 +210,11 @@ Directory.prototype = {
 						var item = jsonObject.bindings[i];
 										
 						if(item.type === 'file'){							
-							cart.addSpecial(item.id, item.name) 
+							cart.addSpecial(item.id, item.name);
 						}else if(item.type === 'directory'){
-							fetch(item.path)
-						}
+							fetch(item.path);
+						};
 					};
-		
 				},
 				method: 'post', 
 				parameters: params.toQueryString(), 
@@ -223,13 +222,16 @@ Directory.prototype = {
 					showError(ER.ajax); 
 				}
 			});
-		}
+		};
+		
 		fetch(folderPath);
 	},
 	
 	actionSelect: function (e){
-		var selectionIndex = e.originalTarget.options.selectedIndex
-		var selectionValue = e.originalTarget.options[selectionIndex].value
+		var selectionIndex = e.target.options.selectedIndex;
+		var selectionValue = e.target.options[selectionIndex].value;
+		
+		Event.stop(e);
 		
 		switch(selectionValue){
 			case 'newFolder':
@@ -237,7 +239,7 @@ Directory.prototype = {
 					newFolder(this);
 				}else{
 					alert('Folder is read-only!');
-				}
+				};
 				break;
 			
 			case 'downloadFolder':
@@ -248,7 +250,7 @@ Directory.prototype = {
 				if(!this.readonly){
 					var newName = prompt('Rename folder ' + this.name + ' to:')
 					if(newName){
-						this.rename_handler('',cleanseFilename( newName) )
+						this.rename_handler('',cleanseFilename( newName) );
 					}
 				}else{
 					alert('Folder is read-only!');
@@ -265,7 +267,7 @@ Directory.prototype = {
 		};
 		
 		this.resetDropDown();
-	},
+	}, 
 		
 	resetDropDown: function (e){
 		var options = this.dropdown.options;
@@ -286,41 +288,45 @@ Directory.prototype = {
 	
 	},
 
-	getContents_handler: function (response) {
-		
+	getContents_handler: function (response) {		
 		this.open = true;
 		Element.addClassName(this.span, 'open');
 		this.opening = false;
 		this.virtual ? this.mark.src = vexpanded : this.mark.src = expanded;		
 		this.hideActivity();
 		var json_data = response.responseText;
+		// FIXME: don't use eval!
 		eval("var jsonObject = ("+json_data+")");
 		if(jsonObject.bindings.length == 0) {
 			this.addBlank(); return true;
-		}		
-		if(jsonObject.bindings[0].error) 
+		};
+		if(jsonObject.bindings[0].error){
 			this.parentObject.update();
+		};
 		for(var i=0; i < jsonObject.bindings.length; i++){
 			this.addChild(jsonObject.bindings[i]);
-		}
-		if (this.andPick && i > 0) this.children[this.andPick].select();
-		if (FC.NEXTPATH && !this.isRoot) { parsePath(FC.NEXTPATH); }
-
-
+		};
+		if (this.andPick && i > 0){
+			this.children[this.andPick].select();
+		};
+		if (FC.NEXTPATH && !this.isRoot){
+			parsePath(FC.NEXTPATH);
+		};
 	},
 	
-	update: function () {
-		if (this.open) {
+	update: function(){
+		if (this.open){
 			var params = $H({ relay: 'getFolder', path: this.path });
 			this.showActivity();
 			var ajax = new Ajax.Request(FC.URL,{
 				onSuccess : this.update_handler.bind(this),
 				method: 'post',
 				parameters: params.toQueryString(),
-				onFailure: function() { showError(ER.ajax); }
+				onFailure: function(){ showError(ER.ajax); }
 			});
-		}
-		else this.getContents();
+		}else{
+			this.getContents();
+		};
 	},
 
 	update_handler: function(response) {
@@ -328,54 +334,64 @@ Directory.prototype = {
 		this.open = true;
 		var json_data = response.responseText; 
 		eval("var jsonObject = ("+json_data+")");		
-		if(jsonObject.bindings.length > 0) { this.removeBlank(); } else this.addBlank();
+		if(jsonObject.bindings.length > 0){
+			this.removeBlank();
+		}else{
+			this.addBlank();
+		};
 		
-		for(var i=0; i < this.children.length; i++) {
+		for(var i=0; i < this.children.length; i++){
 			var found = false;			
-			for (var j=0; j < jsonObject.bindings.length; j++) {
-				if(this.children[i].id == jsonObject.bindings[j].id || this.children[i].id == jsonObject.bindings[j].path) {
+			for (var j=0; j < jsonObject.bindings.length; j++){
+				if(this.children[i].id == jsonObject.bindings[j].id || this.children[i].id == jsonObject.bindings[j].path){
 					found = true;
 					break;
-				}
-			}
+				};
+			};
 
-			if (found) {
+			if(found){
 				if (this.children[i].name != jsonObject.bindings[j].name  || this.children[i].flag != jsonObject.bindings[j].flags && this.children[i].type == 'file') {
 						this.children[i].name = jsonObject.bindings[j].name;
 						this.children[i].flag = jsonObject.bindings[j].flags;
 						this.children[i].refresh();
-				}
+				};
 				jsonObject.bindings.splice(j, 1);				
-			}
-			else { 
+			}else{ 
 				this.removeChild(this.children[i], i); 
 				i--;
-			}
-		}
-		for (var k=0; k < jsonObject.bindings.length; k++) { 
+			};
+		};
+		
+		for(var k=0; k < jsonObject.bindings.length; k++){ 
 			this.addChild(jsonObject.bindings[k]);
-		}
-		if (this.andPick && i > 0) this.children[this.andPick].select(); 
-		if (FC.NEXTPATH) { parsePath(FC.NEXTPATH); }
+		};
+		
+		if (this.andPick && i > 0){
+			this.children[this.andPick].select();
+		};
+		
+		if(FC.NEXTPATH){
+			parsePath(FC.NEXTPATH);
+		};
 	},
 		
 	openOrClose: function () {
-			this.open ? this.clearContents() : this.getContents();
+		this.open ? this.clearContents() : this.getContents();
 	},
 	
-	resetHierarchy: function () {
+	resetHierarchy: function(){
 		if (this.parentObject.type == "directory" && this.parentObject.isRoot == false) {
 			Droppables.remove(this.parentElement);
 			Droppables.add(this.parentElement.id, { accept: FC.TYPES, hoverclass: 'hover', onDrop: this.parentObject.moveTo.bind(this.parentObject) });
 			this.parentObject.resetHierarchy();
-		}
+		};
 	},
 		
-	clearContents: function () {
+	clearContents: function(){				
 		this.removeBlank();
-		while(this.children.length > 0) {
+		while(this.children.length > 0){
 			(this.children[0].type == 'directory' && this.children[0].hasChildren()) ? this.children[0].clearContents() : this.removeChild(this.children[0], 0);
-		}
+		};
 		this.open = false;
 		Element.removeClassName(this.span, 'open');
 		this.virtual ? this.mark.src = vcollapsed : this.mark.src = collapsed;
@@ -385,10 +401,12 @@ Directory.prototype = {
 		if(!index) {
 			for(var i=0; i< this.children.length; i++) {
 				if(this.children[i] == child){ var index = i; break; }
-			}
-		}
+			};
+		};
 		this.children.splice(index, 1);
-		if(child.type == 'directory') Droppables.remove(child.id);
+		if(child.type == 'directory'){
+			Droppables.remove(child.id);
+		};
 		Element.remove(child.element);
 	},
 	
@@ -461,6 +479,14 @@ Directory.prototype = {
 	},
 	
 	select: function (event) {
+		
+		// Prevents dropdrop event from being mungled.
+		if(event){		
+			if(Element.hasClassName( $(event.target), 'dropdown') ){
+				return;
+			};
+		};
+		
 		$('uploadPath').value = this.path;
 		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.path;
 		// this.del.style.display = "block";
@@ -612,7 +638,8 @@ Directory.prototype = {
 				
 		if(this.readonly) return false;
 		if(this.virtual) return false;
-		if(confirm('Delete the folder '+this.name+ '?')) {
+
+		if(confirm('Delete the folder '+this.name+ '?')) {			
 			var params = $H({ relay: 'folderDelete', folder: this.path });
 			this.parentObject.prevChild(this);
 			var ajax = new Ajax.Request(FC.URL,{
@@ -765,8 +792,8 @@ File.prototype = {
 	},
 	
 	actionSelect: function (e){
-		var selectionIndex = e.originalTarget.options.selectedIndex
-		var selectionValue = e.originalTarget.options[selectionIndex].value
+		var selectionIndex = e.target.options.selectedIndex
+		var selectionValue = e.target.options[selectionIndex].value
 		
 		switch(selectionValue){
 			case 'addFiletoCart':
@@ -820,6 +847,15 @@ File.prototype = {
 	},
 	
 	select: function (ev) {
+		
+		// Prevents dropdrop event from being mungled.
+		if(ev){		
+			if(Element.hasClassName( $(ev.target), 'dropdown') ){
+				return;
+			};
+		};
+		
+		
 		$('uploadPath').value = this.parentObject.path;
 		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.parentObject.path;
 		this.dropdown.style.display = "block";
@@ -1506,8 +1542,7 @@ root = null;
 
 // Mass Action
 // ===========================================================================
-
-var checkedFiles = []; // file ID's or directory ID's ""
+var checkedFiles = []; // file & directory elements
 
 function addCheckedFile(file){
 	for(var i=0; i< checkedFiles.length; i++){
@@ -1518,6 +1553,7 @@ function addCheckedFile(file){
 	
 	checkedFiles.push(file);
 };
+
 function removeCheckedfile(file){
 	for(var i=0; i< checkedFiles.length; i++){
 		if(checkedFiles[i].id === file.id){				
@@ -1525,6 +1561,7 @@ function removeCheckedfile(file){
 		};
 	};
 };
+
 function isChecked(file){
 	for(var i=0; i< checkedFiles.length; i++){
 		if(checkedFiles[i].id === file.id){				
@@ -1541,13 +1578,11 @@ function unCheckAll(){
 	};			
 };
 
-
 function massAction(){
-
-	
 
 	function massCleanUp(){
 		unCheckAll();
+		checkedFiles = [];	
 	};
 	
 	function massAdd(){
@@ -1562,7 +1597,6 @@ function massAction(){
 			checkedFiles[i].unlink();
 		};
 		
-		checkedFiles = {};	
 		massCleanUp();
 	};
 	
@@ -1577,12 +1611,10 @@ function massAction(){
 		options[0].selected = true;
 	};
 	
-
 	$('massDelete').onclick = massDelete.bindAsEventListener(this);
 	$('massAdd').onclick = massAdd.bindAsEventListener(this);
 	// $('massMove').onchange = massMove.bindAsEventListener(this);
 };
-
 // ===========================================================================
 
 
@@ -1590,7 +1622,14 @@ function massAction(){
 
 
 
-
+function userLogin_handler_check(response){      
+	var json_data = response.responseText;
+	eval("var jsonObject = ("+json_data+")");
+	var status = jsonObject.bindings[0];
+	if(status.login != 'true'){		
+		document.location = "index.php";
+	}
+}
 
 windowLoader = function () { 
 	root = new Directory('', '', false, $('fileList'));
@@ -1608,15 +1647,6 @@ windowLoader = function () {
 	var ajax = new Ajax.Request('relay.php', {onSuccess: userLogin_handler_check, method: 'post', parameters: 'relay=checkLogin'});
 
 	massAction();
-}
-
-function userLogin_handler_check(response){      
-	var json_data = response.responseText;
-	eval("var jsonObject = ("+json_data+")");
-	var status = jsonObject.bindings[0];
-	if(status.login != 'true'){		
-		document.location = "index.php";
-	}
 }
 
 window.onload = windowLoader;

@@ -149,6 +149,7 @@ a.hot {
 	border:0;
 	margin-bottom:20px;
 }
+
 .directory, .file {
 	margin-left:15px;
 }
@@ -164,7 +165,7 @@ a.hot {
 
 
 .fileCheckbox{
-	margin-left:17px;
+	margin-left:6px;
 }
 
 .directory span, .file span {
