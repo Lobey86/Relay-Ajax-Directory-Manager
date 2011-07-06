@@ -116,6 +116,7 @@ a.hot {
 	position:absolute;
 	top:12px;
 	right:5px;
+	width:70px;
 }
 #filesystem {
 	position:absolute;
@@ -127,14 +128,14 @@ a.hot {
 	float:left;
 	margin-left:2px;
 	display:inline;
-	background:white;
 }
+
 #massActionBar{
-	width:620px;
+	width:600px; 
 	float:left;
 	margin-left:2px;
-	display:inline;
-	margin-bottom:100px;
+/*	display:block;
+*/	margin-bottom:100px;
 	background:#e6e6e6;
 	padding:3px;
 	text-align:right;

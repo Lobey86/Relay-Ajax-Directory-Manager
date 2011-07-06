@@ -1,19 +1,26 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
         "http://www.w3.org/TR/2000/REC-xhtml1-20000126/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
+<head  debug="true">
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <title>Relay</title>	
 <!--  Upgrade warning: Prototype 1.7.0.0 breaks, at least, file information
 pane. -->
 
+
+<script src="js/jquery-1.6.2.min.js" type="text/javascript"> </script>
 <script src="js/prototype.js" type="text/javascript"> </script>
+<script type="text/javascript">
+	jQuery.noConflict();
+</script>
+
 <script src="js/dragdrop.js" type="text/javascript"> </script>
 <script src="js/effects.js" type="text/javascript"> </script>
 <script src="js/search.js" type="text/javascript"></script>
 <script src="js/relay.js" type="text/javascript"></script>
 
 <script type="text/javascript">
+
 	folderIcon = 'images/mac_dir.png';
 	fileIcon = 'images/mac_file.png';
 	collapsed = 'images/collapsed.png';
@@ -158,10 +165,12 @@ div#dashboard {
 </div>
 <div id="filesystem">
 	<div id="searcharea"></div>
+	<div style="clear:both;"></div>
+	
 	<div id="fileList">
 	</div>
 	
-	<div style="clear:both"></div>
+	<div style="clear:both;"></div>
 	
 	<div id="massActionBar">
 		<button id="massDelete" type="button">Delete</button>
