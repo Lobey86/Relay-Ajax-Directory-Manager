@@ -589,6 +589,27 @@ function section($text,$level = 1){
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
 	<title>Relay</title>
 
+	<script src="../js/jquery-1.6.2.min.js" type="text/javascript"> </script>
+	<script type="text/javascript">
+		$(document).ready(function() {
+			$('#regenerate').click(function(){
+				$.ajax({
+					url: "../relay.php?relay=regenerateThumbs",
+					success: function(){
+						alert('Thumbnails have been regenerated!');
+					}
+				});
+
+				return false;
+			});
+		})
+	</script>
+
+
+
+
+
+
 <style type="text/css">
 	* {margin:0; padding:0;}
 	body { margin:0; padding:0; font-size:70%; background:white url(../images/headerbar.png) left -30px repeat-x; font-family:Verdana, Arial, sans-serif;}
@@ -623,7 +644,7 @@ function section($text,$level = 1){
 		
 #head {
 	
-	width:705px;
+	width:865px;
 	height:100px;
 	position:absolute;
 	top:8px;
@@ -689,6 +710,7 @@ table td { padding: 5px 10px; vertical-align:top;}
 
 <?
 		echo "<li><a href='index.php'>Management</a></li>
+		<li><a id='regenerate' href='#'>Regenerate Thumbnails</a></li>
 		<li>|</li>
 		<li><a href='index.php?page=manage&module=clients&action=list'>Virtual Directories</a></li>";
 		

@@ -19,10 +19,10 @@ var Directory = Class.create();
 Directory.prototype = {
 	
 	initialize: function (path, name, flag, parentElement, virtual, scheme, displayname) {
-		this.path = path;
+		this.path = path; 		// "/filestore/folder2"
 		this.type = 'directory';
-		this.name = name;
-		this.id = this.path;
+		this.name = name; 		// "people"
+		this.id = this.path; 	// "/filestore/folder2/people"
 		this.flag = flag;
 		this.virtual = virtual || false;
 		this.open = false;
@@ -126,7 +126,13 @@ Directory.prototype = {
 		this.icon.ondblclick = this.openOrClose.bindAsEventListener(this);
 		this.link.onmousedown = this.select.bindAsEventListener(this);
 		this.span.ondblclick = this.openOrClose.bindAsEventListener(this);
-		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this); 
+		var self = this;
+		this.dropdown.onchange = function(){
+			self.actionSelect(jQuery(this).val());
+		}
+		
+		
+		
 		this.span.onmousedown = this.select.bindAsEventListener(this);
 		this.checkbox.onchange = this.checkbox_handler.bindAsEventListener(this);
 		
@@ -198,19 +204,24 @@ Directory.prototype = {
 
 		// Fetch will recursively call itself when it finds a directory.	
 		function fetch(folderPath){
-			var params = $H({ relay: 'getFolder', path: folderPath });
+			var params = $H({ 
+				relay: 'getFolder', 
+				path: folderPath 
+			});
 		
 			var ajax = new Ajax.Request(FC.URL, {
 				
 				onSuccess: function(response){
 					var json_data = response.responseText;
-					eval("var jsonObject = ("+json_data+")");
+					//eval("var jsonObject = ("+json_data+")");
+					var jsonObject = jQuery.parseJSON(json_data)
+					
 					
 					for(var i=0; i<jsonObject.bindings.length; i++){
 						var item = jsonObject.bindings[i];
 										
 						if(item.type === 'file'){							
-							cart.addSpecial(item.id, item.name);
+							cart.addSpecial(item.path, item.name);
 						}else if(item.type === 'directory'){
 							fetch(item.path);
 						};
@@ -227,13 +238,9 @@ Directory.prototype = {
 		fetch(folderPath);
 	},
 	
-	actionSelect: function (e){
-		var selectionIndex = e.target.options.selectedIndex;
-		var selectionValue = e.target.options[selectionIndex].value;
-		
-		Event.stop(e);
-		
-		switch(selectionValue){
+	actionSelect: function (action){
+
+		switch(action){
 			case 'newFolder':
 				if(!this.readonly){
 					newFolder(this);
@@ -248,10 +255,20 @@ Directory.prototype = {
 				
 			case 'renameFolder':
 				if(!this.readonly){
-					var newName = prompt('Rename folder ' + this.name + ' to:')
-					if(newName){
+					var newName = prompt('Rename folder ' + this.name + ' to:', this.name);
+
+					if(newName && newName !== this.name){
+						
+						// Handle overwrite condition
+						if( fileExists(this.parentElement.object.path + '/' + newName) ){
+							var overWrite = confirm('A folder with that name already exists. Overwrite it?');
+							if(!overWrite){
+								return false;
+							}
+						}
 						this.rename_handler('',cleanseFilename( newName) );
 					}
+					
 				}else{
 					alert('Folder is read-only!');
 				}
@@ -295,17 +312,50 @@ Directory.prototype = {
 		this.virtual ? this.mark.src = vexpanded : this.mark.src = expanded;		
 		this.hideActivity();
 		var json_data = response.responseText;
-		// FIXME: don't use eval!
-		eval("var jsonObject = ("+json_data+")");
+		//eval("var jsonObject = ("+json_data+")");
+		var jsonObject = jQuery.parseJSON(json_data)
+		
 		if(jsonObject.bindings.length == 0) {
 			this.addBlank(); return true;
 		};
 		if(jsonObject.bindings[0].error){
 			this.parentObject.update();
 		};
+		
+		// Arrange so folders are always on top
+		var dirs = [];
+		var files= [];
+		
 		for(var i=0; i < jsonObject.bindings.length; i++){
-			this.addChild(jsonObject.bindings[i]);
+			var object = jsonObject.bindings[i];
+
+			if(object.type === 'directory'){
+				dirs.push(object);
+			}else{
+				files.push(object);
+			};
 		};
+		
+		function compare(a,b) {
+		  if (a.name < b.name)
+		     return -1;
+		  if (a.name > b.name)
+		    return 1;
+		  return 0;
+		}
+		
+		files.sort(compare);
+		dirs.sort(compare);
+		
+		for(var i=0; i<dirs.length; i++){
+			this.addChild(dirs[i]);
+		};
+		for(var i=0; i<files.length; i++){
+			this.addChild(files[i]);
+		};
+		
+		
+		
 		if (this.andPick && i > 0){
 			this.children[this.andPick].select();
 		};
@@ -333,7 +383,9 @@ Directory.prototype = {
 		this.hideActivity();
 		this.open = true;
 		var json_data = response.responseText; 
-		eval("var jsonObject = ("+json_data+")");		
+		//eval("var jsonObject = ("+json_data+")");
+		var jsonObject = jQuery.parseJSON(json_data)
+				
 		if(jsonObject.bindings.length > 0){
 			this.removeBlank();
 		}else{
@@ -362,7 +414,9 @@ Directory.prototype = {
 			};
 		};
 		
-		for(var k=0; k < jsonObject.bindings.length; k++){ 
+		for(var k=0; k < jsonObject.bindings.length; k++){
+			
+			 
 			this.addChild(jsonObject.bindings[k]);
 		};
 		
@@ -438,14 +492,25 @@ Directory.prototype = {
 		Element.removeClassName(this.element, 'hover');
 		if (element.object.parentObject == this) { return false; }
 		if ( element.object.type == 'directory' ) {
+			
+			// Handle overwrite condition
+			if( fileExists(this.path + '/' + element.object.name) ){
+				var overWrite = confirm('A folder with that name already exists there. Overwrite it?');
+				if(!overWrite){
+					return false;
+				}
+			}
+			
 			var params = $H({ 
 				relay: 'folderMove', 
-				name: element.object.name, 
+				name: element.object.name,
 				path: element.object.parentObject.path, 
-				newpath: this.path
+				where: this.path
 			});
+			
+			
 			FC.SEARCHOBJ = this;
-			FC.NEXTPATH = '/'+ element.object.name;
+			FC.NEXTPATH = '/'+ element.object.name; 
 			
 			element.object.clearContents();	
 			element.object.clear();
@@ -455,12 +520,24 @@ Directory.prototype = {
 				parameters: params.toQueryString(), 
 				onFailure: function() { showError(ER.ajax); }
 			});
-
+		// Move file
 		} else {
+			
+			
+			// Handle overwrite condition
+			if( fileExists(this.path + '/' + element.object.name) ){
+				var overWrite = confirm('A file with that name already exists there. Overwrite it?');
+				if(!overWrite){
+					return false;
+				}
+			}
+			
 			var params = $H({ 
 				relay: 'fileMove', 
-				fileid: element.object.id, 
-				path: this.path 
+				path: element.object.path,
+				filename: element.object.name,
+				id: element.object.id,
+				where: this.path 
 			});
 			FC.SEARCHOBJ = this;
 			FC.NEXTPATH = '/'+ element.object.name;
@@ -479,7 +556,7 @@ Directory.prototype = {
 	},
 	
 	select: function (event) {
-		
+				
 		// Prevents dropdrop event from being mungled.
 		if(event){		
 			if(Element.hasClassName( $(event.target), 'dropdown') ){
@@ -535,7 +612,7 @@ Directory.prototype = {
 			this.selected = false; 
 			this.clearRename();
 	},
-	
+	  
 	getMeta: function () {
 		$('meta').prevElement = this.path;
 		var params = $H({ relay: 'getFolderMeta', path: this.path });
@@ -550,7 +627,10 @@ Directory.prototype = {
 	
 	getMeta_handler: function(response) {
 		var json_data = response.responseText;		
-		eval("var jsonObject = ("+json_data+")");
+		//eval("var jsonObject = ("+json_data+")");
+		
+		var jsonObject = jQuery.parseJSON(json_data)
+		
 		if (jsonObject.bindings.length >= 1) {
 			var meta = { name: jsonObject.bindings[0].name, size: jsonObject.bindings[0].size, path: this.path};
 			updateMeta(meta);
@@ -587,11 +667,15 @@ Directory.prototype = {
 		}
 	},
 	
-	rename_handler: function (event, direct) {
+	rename_handler: function (event, direct) {		
 		if(!direct) { var charCode = (event.charCode) ? event.charCode : ((event.which) ? event.which : event.keyCode); 
 		if (charCode == Event.KEY_ESC) this.clearRename(); }
 		if (charCode == Event.KEY_RETURN || direct) {
-			var params = $H({ relay : 'folderRename', path  : this.parentObject.path, name  : this.name, newname: direct || this.newName.value });
+			var params = $H({ 
+				relay : 'folderRename', 
+				path  : this.parentObject.path, 
+				name  : this.name, 
+				newname: direct || this.newName.value });
 			this.link.innerHTML = params.newname;
 			this.clearRename();
 			
@@ -670,22 +754,26 @@ Directory.prototype = {
 	
 };
 
+
+
+
 var File = Class.create();
 File.prototype = {
 	
-	initialize: function (id, name, flag, parentElement, date) {
+	initialize: function (id, name, flag, parentElement, date, optPath) {
 		
 		this.type = 'file';
 		this.fileDate = date;
-		this.name = name;
-		this.id = id;
+		this.name = name; 		// "AmeeDonavan.jpeg"
+		this.id = id; 			// "_filestore_people_AmeeDonavan_jpeg"
 		this.flag = flag;
 		this.selected = false;
 		this.timer = null;
+		this.path = optPath || parentElement.object.path; // "/filestore/people" 
 		this.interval = 1000;
 		this.parentElement = parentElement;
 		this.parentObject = parentElement.object;
-		this.readonly = this.parentObject.readonly;
+		this.readonly = false; //this.parentObject.readonly;
 		this.parentElement.id == 'searchresults' ? this.search = true : this.search = false;
 		this.createFile();
 	},
@@ -746,6 +834,7 @@ File.prototype = {
 			this.dropdown.options.add( deleteFileOpt );
 		}
 		Element.addClassName(this.dropdown, 'dropdown');
+
 		
 		/*
 			TODO: Attaching event handlers to every object is inefficient. 
@@ -756,15 +845,22 @@ File.prototype = {
 		this.icon.onmousedown = this.select.bind(this);
 		this.link.ondblclick = this.download.bindAsEventListener(this);
 		this.icon.ondblclick = this.download.bindAsEventListener(this);
-		this.dropdown.onchange = this.actionSelect.bindAsEventListener(this);
+		var self = this;
+		this.dropdown.onchange = function(){
+			self.actionSelect(jQuery(this).val());
+		}
 		this.checkbox.onchange = this.checkbox_handler.bindAsEventListener(this);
 	
-		this.handle.appendChild(this.checkbox)
+		if(!this.search){
+			this.handle.appendChild(this.checkbox)
+		}
 		this.handle.appendChild(this.icon);
 		this.handle.appendChild(this.link);
 		this.span.appendChild(this.handle);
 		this.span.appendChild(this.date);
-		this.span.appendChild(this.dropdown)
+		if(!this.search){
+			this.span.appendChild(this.dropdown)
+		}
 		this.element.appendChild(this.span);
 		
 		this.search ? this.element.id = 'sid'+this.id : this.element.id = 'fid'+this.id;
@@ -791,25 +887,54 @@ File.prototype = {
 		}
 	},
 	
-	actionSelect: function (e){
-		var selectionIndex = e.target.options.selectedIndex
-		var selectionValue = e.target.options[selectionIndex].value
+	actionSelect: function (action){
+
 		
-		switch(selectionValue){
+		switch(action){
 			case 'addFiletoCart':
 				this.addDl();
 				break;
 			
 			case 'downloadFile':
-				location.href = FC.URL+'?relay=getFilePackage&fileid=' + this.id
+				location.href = FC.URL+'?relay=getFilePackage&paths=' + this.path + '~' + this.name
 				break;
 				
 			case 'renameFile':
 				if(!this.readonly){			
-					var newName = prompt('Rename folder ' + this.name + ' to:')
-					if(newName){
-						var description =  this.description || '';
-						saveMetaSpecial(this.id, this.type, cleanseFilename(newName), description, this.flag)
+					var newName = prompt('Rename folder ' + this.name + ' to:', this.name)
+					if(newName && newName !== this.name){
+					
+
+						// Handle overwrite condition
+						if( fileExists(this.path + '/' + newName) ){
+							var overWrite = confirm('A file with that name already exists. Overwrite it?');
+							if(!overWrite){
+								return false;
+							}
+						}
+
+						var params = $H({ 
+							relay: 'fileRename', 
+							
+							path: this.path,
+							filename: this.name,
+							id: this.id,
+							newName:newName
+						});
+						
+						var self = this; // preserve "this" context
+						var ajax = new Ajax.Request(FC.URL,{
+							onLoading: showMetaSpinner(), 
+							onSuccess: function(){
+								self.name = newName;
+								self.refresh();
+								self.getMeta();
+							},
+							method: 'post', 
+							parameters: params.toQueryString(), 
+							onFailure: function() { showError(ER.ajax); }
+						});
+						
 					}
 				}
 				break;
@@ -836,25 +961,23 @@ File.prototype = {
 	
 	addDl : function() { cart.add(this.element); },
 	
-	download: function () { location.href = FC.URL + '?relay=getFile&fileid=' + this.id; },
+	download: function () { location.href = FC.URL + '?relay=getFile&path=' + this.path +'/' + this.name; },
 	
 	refresh: function () {
 		this.link.className = 'link';
 		this.link.innerHTML = this.name;
-		this.flag != 'normal' ? this.icon.src = "images/"+this.flag+".png" : this.icon.src= fileIcon;
+		this.flag != '' ? this.icon.src = "images/"+this.flag+".png" : this.icon.src= fileIcon;
 		
 		Element.addClassName(this.link, this.flag);
 	},
 	
-	select: function (ev) {
-		
+	select: function (ev) {		
 		// Prevents dropdrop event from being mungled.
 		if(ev){		
 			if(Element.hasClassName( $(ev.target), 'dropdown') ){
 				return;
 			};
 		};
-		
 		
 		$('uploadPath').value = this.parentObject.path;
 		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.parentObject.path;
@@ -889,9 +1012,19 @@ File.prototype = {
 	},
 	
 	getMeta: function () {
+				
+				
 		$('meta').prevElement = this.id;
 	
-		var params = $H({ relay: 'getMeta', fileid: this.id });
+		var path = this.path; //this.parentObject.path;
+		var filename = this.name;
+		
+		var params = $H({ 
+			relay: 'getMeta', 
+			path: path, 
+			filename: filename,
+			id: this.id
+		});
 		var ajax = new Ajax.Request(FC.URL,{
 			onLoading: showMetaSpinner(), 
 			onSuccess: this.getMeta_handler.bind(this),
@@ -903,13 +1036,13 @@ File.prototype = {
 	
 	getMeta_handler: function (response) {
 		var json_data = response.responseText;		
-		eval("var jsonObject = ("+json_data+")");
+		//eval("var jsonObject = ("+json_data+")");
+		var jsonObject = jQuery.parseJSON(json_data);
 		var meta = {	edit		: jsonObject.bindings[0].edit,
 						filename  : jsonObject.bindings[1].filename,
 						date		: jsonObject.bindings[1].date,
-						downloads : jsonObject.bindings[1].downloads,
-						flag		: jsonObject.bindings[1].flags,
-						type		: jsonObject.bindings[1].type || 'Document',
+						flag		: jsonObject.bindings[1].flag,
+						type		: jsonObject.bindings[1].type || 'Document', //
 						description: jsonObject.bindings[1].description,
 						size		: jsonObject.bindings[1].size,
 						file		: true,
@@ -917,7 +1050,13 @@ File.prototype = {
 						image		: jsonObject.bindings[1].image,
 						path		: jsonObject.bindings[1].path
 					};
+					
+		this.flag = meta.flag;
+		this.refresh()
+			
 		updateMeta(meta);
+		
+		
 	},
 	
 	clear: function () {
@@ -935,7 +1074,12 @@ File.prototype = {
 		
 		if(confirm('Delete the file '+this.name+ '?')) {
 		
-			var params = $H({ relay: 'fileDelete', fileid: this.id });
+			var params = $H({ 
+				relay: 'fileDelete', 
+				path: this.path,
+				filename: this.name,
+				id: this.id
+			});
 			var ajax = new Ajax.Request(FC.URL,{
 				onComplete: this.parentObject.nextChild(this),
 				onSuccess: this.clear.bind(this),
@@ -962,8 +1106,9 @@ File.prototype = {
 		if (charCode == Event.KEY_RETURN) {
 			var params = $H({
 				relay : 'fileRename',
-				fileid : this.id,
-				filename: this.newName.value
+				path: this.path,
+				filename: this.name,
+				id: this.id
 			});
 			this.link.innerHTML = this.newName.value;
 			this.name = this.newName.value;
@@ -1000,18 +1145,38 @@ File.prototype = {
 	}
 };
 
+// Synchronous ajax call to determine if a path already exists on the server.
+function fileExists(path){
+	var params = { 
+		relay: 'fileExists', 
+		path: path
+	};
+	
+	// Prototype sucks. No async ajax.
+	var response = jQuery.ajax({
+		url: FC.URL,
+		type: "POST",
+		data: (params),
+		dataType: "json",
+		async: false
 
+	}).responseText;
+	
+	return jQuery.parseJSON(response).bindings[0].exists;
+}
 
 
 
 // NON OBJECT METHODS
 // ===========================================================================
-
+ 
 function cleanseFilename(string){
 	return string.replace(/['";{}]/g,"");
 }
 
 updateMeta = function (meta) {
+	
+	
 	meta = $H(meta);
 	$('meta').innerHTML = '';
 	var path = meta.path.replace('/', ' /');
@@ -1024,9 +1189,28 @@ updateMeta = function (meta) {
 			case 'emergency': emergencyflag = 'selected'; break;
 		}
 		
-		var metaFlags = '<option label="Normal" value="normal" '+normalflag+' >Normal</option><option label="Hot" value="hot" '+hotflag+' >Hot</option><option label="Emergency" value="emergency" '+emergencyflag+'>Emergency</option>';
-		if(meta.image == '1') $('meta').innerHTML += '<div class="thumbbox"><a href="'+FC.URL+'?relay=getFile&fileid='+meta.id+'" ><img src="'+FC.URL+'?relay=getThumb&fileid='+meta.id+'" class="metaThumbnail" alt="" /></a></div>';
-		$('meta').innerHTML += ' <table><tr><td class="l">Name</td><td><input type="text" name="filename" onfocus="window.onkeypress=\'null\'"; id="metaFilename" value="'+meta.filename+'" /></td></tr><tr><td class="l">Kind</td><td>'+meta.type+'</td></tr><td class="l">Size</td><td>'+meta.size+'</td></tr><tr><td class="l">Date</td><td>'+meta.date+'</td></tr><tr><td class="l">Where</td><td><div style="width:115px; overflow:hidden"><a href="'+FC.SCRIPTSRC+'?path='+meta.path+'/'+meta.filename+'">'+path+' /'+meta.filename+'</a></div></td></tr><tr><td class="l">Flag</td><td><select id="metaFlag" name="metaFlag" id="metaFlag">'+metaFlags+'</select></td></tr><tr><tr><td class="l"><a href="#" onclick="saveMeta(); return false"><img src="'+saveIcon+'" alt="" /></a></td><td><textarea name="description" onfocus="window.onkeypress=\'null\'"; id="metaDesc">'+meta.description+'</textarea></td></tr></table>';
+		var metaFlags = '<option label="Normal" value="" '+normalflag+' >Normal</option><option label="Hot" value="hot" '+hotflag+' >Hot</option><option label="Emergency" value="emergency" '+emergencyflag+'>Emergency</option>';
+		
+		// Thumbnail
+		if(meta.image) {
+			
+			$('meta').innerHTML += ''+
+			'<div class="thumbbox">'+
+				'<a href="'+FC.URL+'?relay=getFile&path='+meta.path+'/'+meta.filename+'" >'+
+					'<img src="'+FC.URL+'?relay=getThumb&path='+meta.path+'&filename='+meta.filename+'" class="metaThumbnail" alt="" />'+
+				'</a>'+
+			'</div>';
+		}
+		
+		$('meta').innerHTML += ' <table><tr><td class="l">Name</td><td><input type="text" name="filename" onfocus="window.onkeypress=\'null\'"; id="metaFilename" value="'+meta.filename+
+			'" /></td></tr><tr><td class="l">Kind</td><td>'+meta.type+'</td></tr><td class="l">Size</td><td>'+meta.size+
+			'</td></tr><tr><td class="l">Date</td><td>'+meta.date+
+			'</td></tr>'+
+			'<tr><td class="l">Where</td><td><div style="width:115px; overflow:hidden">'+path+'</div></td>'+
+			'</tr><tr><td class="l">Flag</td><td><select id="metaFlag" name="metaFlag" id="metaFlag">'+metaFlags+'</select></td></tr>'+
+			'<tr><tr><td class="l"><a href="#" onclick="saveMeta(); return false"><img src="'+saveIcon+'" alt="" /></a></td>'+
+			'<td>'+
+				'<textarea name="description" id="metaDesc">'+meta.description+'</textarea></td></tr></table>';
 	}
 	else if (FC.SELECTEDOBJECT.virtual) {
 		$('meta').innerHTML = '<table><tr><td class="l">Name</td><td>'+meta.name+'</td></tr><tr><td class="l">Size</td><td>'+meta.size+'</td></tr></table>';
@@ -1037,20 +1221,26 @@ updateMeta = function (meta) {
 }
 
 saveMeta = function () {
-
 	if(FC.SELECTEDOBJECT.type == 'directory') {
 		FC.SELECTEDOBJECT.rename_handler("", cleanseFilename( $('folderMeta').value ) );
 		return false;
 	}
+		
+	var id = FC.SELECTEDOBJECT.id; 
+	var path = FC.SELECTEDOBJECT.path;
+	var filename = FC.SELECTEDOBJECT.name;
+	var description = $('metaDesc').value;
+	var flags = $('metaFlag').options[$('metaFlag').selectedIndex].value;
+		
+	var params = $H({
+		relay: 'setMeta', 
+		path: path, 
+		filename: filename,
+		id: id,
+		description: description,
+		flags: flags
+	});
 	
-	var metaFilename = cleanseFilename( $('metaFilename').value );
-	var metaFlag = $('metaFlag').options[$('metaFlag').selectedIndex].value;
-	var metaDesc = $('metaDesc').value;
-	
-	FC.SELECTEDOBJECT.name = metaFilename;
-	FC.SELECTEDOBJECT.flag = metaFlag;
-	
-	var params = $H({relay: 'setMeta', fileid: FC.SELECTEDOBJECT.id, filename: metaFilename, description: metaDesc, flags: metaFlag });
 	var ajax = new Ajax.Request(FC.URL, {
 		onComplete: function() { $('metaSave').style.display = 'block'; Effect.Fade('metaSave', {duration:3}); },
 		onSuccess: FC.SELECTEDOBJECT.refresh.bind(FC.SELECTEDOBJECT),
@@ -1058,6 +1248,14 @@ saveMeta = function () {
 		parameters: params.toQueryString(), 
 		onFailure: function() { showError(ER.ajax); }
 	});
+	
+	
+	// For updating GUI I guess...
+	var metaFilename = cleanseFilename( $('metaFilename').value );
+	FC.SELECTEDOBJECT.name = metaFilename;
+	FC.SELECTEDOBJECT.flag = flags;
+	
+	
 }
 
 /*
@@ -1065,24 +1263,19 @@ saveMeta = function () {
 	follows the existing "convention" of cart.addSpecial() of creating a 
 	duplicate function that accepts values vice being coupled to the UI.
 */
-function saveMetaSpecial(fileID, fileType, fileName, fileDescr, fileFlag){
+//function saveMetaSpecial(fileID, fileType, fileName, fileDescr, fileFlag){
+function saveMetaSpecial(path, filename){
 	
 	fileName = cleanseFilename(fileName); 
-	
-	if(fileType === 'directory'){
-		FC.SELECTEDOBJECT.rename_handler(null, fileName);
-		return false;
-	}
-	
+
 	FC.SELECTEDOBJECT.name = fileName;
 	FC.SELECTEDOBJECT.flag = fileFlag;
 	
 	var params = $H({
 		relay: 'setMeta', 
-		fileid: fileID, 
-		filename: fileName, 
-		description: fileDescr, 
-		flags: fileFlag 
+		path: path, 
+		filename: fileName
+
 	});
 	
 	var ajax = new Ajax.Request(FC.URL, {
@@ -1189,7 +1382,10 @@ function uploadAuth() {
 
 function uploadAuth_handler(response) {
 	var json_data = response.responseText; 
-	eval("var jsonObject = ("+json_data+")");
+//	eval("var jsonObject = ("+json_data+")");
+	
+	var jsonObject = jQuery.parseJSON(json_data)
+	
 	var auth = jsonObject.bindings[0];
 
 	if(auth.auth == 'true') {
@@ -1226,7 +1422,9 @@ pgwidth = 180;
 
 function uploadStatus_handler(response) {
 	var json_data = response.responseText; 
-	eval("var jsonObject = ("+json_data+")");
+	//eval("var jsonObject = ("+json_data+")");
+	var jsonObject = jQuery.parseJSON(json_data)
+	
 	var progress = jsonObject.bindings[0];
 
 	if(progress.done == 'false') {
@@ -1408,22 +1606,25 @@ Cart.prototype = {
 		}
 	
 		var name = element.object.name;
-		var fileid = element.object.id;
+		
+		var filePath = element.object.path + '~' + element.object.name;
+		
 		for(var i=0; i < this.children.length; i++){
-			if(fileid == this.children[i]) { return false; }
+			if(filePath == this.children[i]) { return false; }
 		}
 	
 		row = document.createElement('div');
-		row.id = 'c'+fileid;
+		row.id = 'c'+filePath;
 		row.innerHTML = '<div>'+name+'</div>';
-		row.innerHTML += '<a href="#" onclick="cart.remove(\''+fileid+'\'); return false" class="remove"></a>';
+		row.innerHTML += '<a href="#" onclick="cart.remove(\''+filePath+'\'); return false" class="remove"></a>';
 	
 		this.element.appendChild(row);
-		this.children[this.children.length] = fileid;
+		this.children[this.children.length] = filePath;
 		
 	},
-	addSpecial: function (fid, fname) {
-		var e = { object: {name : fname, id: fid} };
+	addSpecial: function (path, name) {
+				
+		var e = { object: {path: path, name: name} };
 		cart.add(e);
 	},
 			
@@ -1452,7 +1653,7 @@ Cart.prototype = {
 		if($('emailFormTo').value != '' && $('emailFormTo').value != 'Type email address') 
 			this.email(cartIDs);
 		else
-			location.href = FC.URL+'?relay=getFilePackage&fileid=' + cartIDs;
+			location.href = FC.URL+'?relay=getFilePackage&paths=' + cartIDs;
 	},
 	
 	email: function(cartIDs) {
@@ -1514,7 +1715,9 @@ function userLogin(){
 
 function userLogin_handler(response){      
 	var json_data = response.responseText;
-	eval("var jsonObject = ("+json_data+")");
+	//eval("var jsonObject = ("+json_data+")");
+	var jsonObject = jQuery.parseJSON(json_data)
+	
 	var status = jsonObject.bindings[0];
 	if (status.login == 'true'){ 
 		root.getContents(); 
@@ -1624,7 +1827,9 @@ function massAction(){
 
 function userLogin_handler_check(response){      
 	var json_data = response.responseText;
-	eval("var jsonObject = ("+json_data+")");
+	//eval("var jsonObject = ("+json_data+")");
+	var jsonObject = jQuery.parseJSON(json_data)
+	
 	var status = jsonObject.bindings[0];
 	if(status.login != 'true'){		
 		document.location = "index.php";
@@ -1639,7 +1844,6 @@ windowLoader = function () {
 	
 	new UploadManager('fileUpload');
 	cart = new Cart('cart');
-	
 	setInterval("updateAll(root)", 60000);
 	search = new Search('searcharea');
 	//Field.activate('searchbar');

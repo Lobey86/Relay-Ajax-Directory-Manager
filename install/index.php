@@ -363,6 +363,7 @@ $conffile = "<?
     \$imageTypes = \"/$imageTypes/\";
     \$dateFormat = \"%b,%e %Y %h:%i %p\";
     \$passwordKey = \"$key\";
+	\$thumbnailPrefix = \".relaytn_\";
 
     // paths
     \$rootPath    = \"$rootpath\";
