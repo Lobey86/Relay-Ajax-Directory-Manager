@@ -5,7 +5,7 @@ if(!isset($resource))$resource = "0";
 // session initilization
 session_start();
 include_once("conf.inc.php");
-
+ 
 // Routing
 // ***************************************************************************
 if($resource != true){
@@ -43,6 +43,11 @@ if($resource != true){
 					getFile($_GET['path']);
 				}
 				break;
+			case "folderIsDeletable": 
+				if(isset($_POST['path'])){
+					folderIsDeletable($_POST['path']);
+				}
+				break;
 			case "getFilePackage":
 				if(isset($_GET['paths'])){
 					getFilePackage($_GET['paths']);
@@ -63,6 +68,12 @@ if($resource != true){
 					getFolderMeta($_POST['path']);
 				} 
 				break;
+				
+			case "fileIsWritable":
+				if(isset($_POST['path'])){
+					fileIsWritable($_POST['path']);
+				} 
+				break;	
 			case "setMeta":
 				if(isset($_POST['path'],$_POST['filename'],$_POST['id'],$_POST['description'],$_POST['flags'])){
 					setMeta($_POST['path'],$_POST['filename'],$_POST['id'],$_POST['description'],$_POST['flags']);
@@ -278,7 +289,7 @@ function directoryToArray($directory, $recursive) {
 	//	)
 	
     $array_items = array();
-    if ($handle = opendir($directory)) {
+    if ($handle = opendir( localizePath($directory))) {
         while (false !== ($file = readdir($handle))) {
             if ($file != "." && $file != "..") {
                 if (is_dir($directory. "/" . $file)) {
@@ -591,7 +602,7 @@ function jsonReturn($variableName){
 }
 
 function error($message){
-	echo "{\"bindings\": [ {'error': \"$message\"} ]}";
+	echo "{\"bindings\": [ {\"error\": \"$message\"} ]}";
 	exit;
 }
 
@@ -644,7 +655,7 @@ function getThumb($path, $filename, $regen = false){
 // Creates a thumbnail of the provided image and stores it in /thumbnails
 function thumbnail($path, $filename){
 	
-	global $thumbnailPrefix;
+	global $thumbnailPrefix, $ghostScript;
 	
 	$file = explode('.', $filename);
 	$extension = strtolower( array_pop($file) );
@@ -657,28 +668,29 @@ function thumbnail($path, $filename){
 	
 	// Set up source image
 	if($extension == 'jpeg' || $extension == 'jpg'){
-		$src_img=imagecreatefromjpeg($srcImagePath);
+		$src_img=imagecreatefromjpeg($srcImagePath); 
 	}else if($extension == 'png'){
 		$src_img=imagecreatefrompng($srcImagePath);
+	}else if($extension == 'gif'){
+		$src_img=imagecreatefromgif($srcImagePath);
 	}else if($extension == 'pdf'){
 		$file1 = $srcImagePath;
 		$file2 = $srcImagePath .'temp';
-		#echo "E:/duarte.com/relay/supportapps/gs/gs8.50/bin/gswin32c.exe -q -dNOPAUSE -dBATCH -sDEVICE=jpeg -sOutputFile=\"$file2\" \"$file1\" 2>&1";
-	
 		$code = "$ghostScript -q -dNOPAUSE -dBATCH -dFirstPage=1 -dLastPage=1 -sDEVICE=jpeg -sOutputFile=\"$file2\" \"$file1\" 2>&1";
-		#if($resource == true)echo "$code";
 		$result1 = @exec($code);
 		$src_img=imagecreatefromjpeg($file2);
 		$deletefile = $file2;
 	}else if($extension == 'x-photoshop' || $extension == 'postscript'){
 		$file1 = $srcImagePath;
 		$file2 = $srcImagePath . 'temp';
-	
 		$code = "$convertpath \"$file1\" -render -flatten -resize ".$thumbsize."x".$thumbsize." \"$file2\"";
-	
 		$result1 = @exec($code);
 		$src_img=imagecreatefromjpeg($file2);
 		$deletefile = $file2;
+	}
+	
+	if( file_exists( localizePath($deletefile) ) ){
+		unlink(localizePath($deletefile));
 	}
 	
 	// Set thumbnail dimensions	
@@ -701,7 +713,6 @@ function thumbnail($path, $filename){
 		$thumb_h=$thumbsize;
 	}
 	
-	// Create thumbnail
 	$dst_img=ImageCreateTrueColor($thumb_w,$thumb_h);
 	imagecopyresampled($dst_img,$src_img,0,0,0,0,$thumb_w,$thumb_h,$old_x,$old_y);
 	
@@ -964,6 +975,9 @@ function folderDelete($path){
 	$deleteDir = getUserPath($path).$path;
 
     if(getUserAuth('folderDelete',$path)){
+	
+		//fileIsWritable($path, $rtn = false)
+	
 
 		logAction('delete',	$deleteDir);
 
@@ -1009,10 +1023,78 @@ function newFolder($name, $path){
 	}
 }
 
+// Determines if file writable.
+function folderIsDeletable($path, $rtn = false){
+
+	logAction('folderIsDeletable', $path);
+	jsonStart();
+
+	if( file_exists( localizePath($path) ) ){
+
+		$filestructure = directoryToArray($path, true);
+		$writable = true;
+	
+		foreach ($filestructure as $item) {
+			$name = $item['name'];
+			$type = $item['type'];
+			$path = '/' . $item['path'];
+
+			if( !fileIsWritable(localizePath($path .'/'. $name), true) ){
+				$writable = false;
+			}
+		}
+	
+		if($rtn){
+			return $writable;
+		}else{
+			if($writable){
+				jsonAdd("\"writable\": true ");
+			}else{
+				jsonAdd("\"writable\": false  ");
+			}
+		}
+		
+	}else{
+		error('File doesn\'t exist.');
+	}
+
+	echo jsonReturn('folderIsDeletable');
+
+}
 
 
 // File Methods
 // ***************************************************************************
+
+// Determines if file writable.
+function fileIsWritable($path, $rtn = false){
+	logAction('fileIsWritable', $path);
+	
+	jsonStart();
+	
+	if( file_exists( localizePath($path) ) ){
+		$permissions = substr( decoct( fileperms( localizePath($path) ) ), -3);
+		$permissions += 0;
+		$writable = ($permissions > 640)? true: false; 
+
+		if($rtn){
+			return $writable;
+		}else{
+			if($writable){
+				jsonAdd("\"writable\": true ");
+				jsonAdd("\"perm\": $permissions ");
+			}else{
+				jsonAdd("\"writable\": false  ");
+				jsonAdd("\"perm\": $permissions ");
+			}
+		}
+	}else{
+		error('File doesn\'t exist.');
+	}
+	
+	echo jsonReturn('fileIsWritable');
+}
+
 
 // Renames a file and any associated thumbnail or db records
 function fileRename($path, $filename, $id, $newName){
@@ -1260,7 +1342,9 @@ function getMeta($path, $filename, $id, $rtn = false){
 		if( count($file) > 1 ){ // Handle no extension
 			$extension = array_pop($file);
 			
-			if($extension === 'jpg' || 
+			
+			
+			if( strtolower($extension) === 'jpg' || 
 					$extension === 'jpeg' || 
 					$extension === 'gif' || 
 					$extension === 'png' || 
