@@ -1340,11 +1340,11 @@ function getMeta($path, $filename, $id, $rtn = false){
 
 		$file = explode('.', $filename);
 		if( count($file) > 1 ){ // Handle no extension
-			$extension = array_pop($file);
+			$extension = strtolower( array_pop($file) );
 			
 			
 			
-			if( strtolower($extension) === 'jpg' || 
+			if( $extension === 'jpg' || 
 					$extension === 'jpeg' || 
 					$extension === 'gif' || 
 					$extension === 'png' || 
