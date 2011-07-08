@@ -1,11 +1,21 @@
-// Copyright (c) 2006 Chris Iufer & David Barshow (http://ecosmear.com/relay)
+// 
+// $file1 = $srcImagePath;
+// $file2 = $srcImagePath .'temp';
+// $code = "$ghostScript -q -dNOPAUSE -dBATCH -dFirstPage=1 -dLastPage=1 -sDEVICE=jpeg -sOutputFile=\"$file2\" \"$file1\" 2>&1";
+// 
+// $result1 = @exec($code);
+// 
+// $src_img=imagecreatefromjpeg($file2);
+// 
+// $deletefile = $file2;
+//// Copyright (c) 2006 Chris Iufer & David Barshow (http://ecosmear.com/relay)
 
 var FC = {
 	URL: 'relay.php',
 	TYPES: new Array('file','directory'),
 	SELECTEDOBJECT: null,
 	SHOWALL: false,
-	SCRIPTSRC: location.href,
+	SCRIPTSRC: location.href, 
 	SEARCHOBJ: null,
 	NEXTPATH: null,
 	AJAXCALL: 0,
@@ -255,6 +265,14 @@ Directory.prototype = {
 				
 			case 'renameFolder':
 				if(!this.readonly){
+					
+					// Check file permissions
+					// Note circumventing this will not allow editing a write-protected file 
+					if( !fileWritable(this.path) ){
+						alert('This folder is not writable.');
+						return;
+					}
+					
 					var newName = prompt('Rename folder ' + this.name + ' to:', this.name);
 
 					if(newName && newName !== this.name){
@@ -276,6 +294,19 @@ Directory.prototype = {
 				
 			case 'deleteFolder':
 				if(!this.readonly){
+					
+					if( !fileWritable(this.path) ){
+						alert('This folder is not writable.');
+						return;
+					}
+					
+					
+					if( !folderIsDeletable(this.path) ){
+						alert('This folder contains write-protected folders or files.');
+						return;
+					}
+					
+					
 					this.unlink();
 				}else{
 					alert('Folder is read-only!');
@@ -325,7 +356,7 @@ Directory.prototype = {
 		// Arrange so folders are always on top
 		var dirs = [];
 		var files= [];
-		
+				
 		for(var i=0; i < jsonObject.bindings.length; i++){
 			var object = jsonObject.bindings[i];
 
@@ -467,6 +498,8 @@ Directory.prototype = {
 	clear: function () { this.parentObject.removeChild(this); },
 
 	addChild:  function (child) {
+		
+		
 		if (child.type == 'file') {
 			var newFile = new File(child.id, child.name, child.flags, this.element, child.date);
 			
@@ -493,8 +526,17 @@ Directory.prototype = {
 		if (element.object.parentObject == this) { return false; }
 		if ( element.object.type == 'directory' ) {
 			
+			// Check file permissions on me
+			// Note circumventing this will not allow editing a write-protected file 
+			if( !fileWritable(element.object.path) ){
+				alert('This folder is not writable.');
+				return;
+			}
+			
 			// Handle overwrite condition
 			if( fileExists(this.path + '/' + element.object.name) ){
+				
+				
 				var overWrite = confirm('A folder with that name already exists there. Overwrite it?');
 				if(!overWrite){
 					return false;
@@ -521,16 +563,35 @@ Directory.prototype = {
 				onFailure: function() { showError(ER.ajax); }
 			});
 		// Move file
-		} else {
+		} else { 
 			
 			
 			// Handle overwrite condition
-			if( fileExists(this.path + '/' + element.object.name) ){
+			if( fileExists(this.path + '/' + element.object.name) ){				
 				var overWrite = confirm('A file with that name already exists there. Overwrite it?');
 				if(!overWrite){
 					return false;
 				}
 			}
+			
+			// Check file permissions on file to be moved
+			if( !fileWritable(element.object.path + '/' + element.object.name) ){
+				alert('This file is not writable.');
+				return;
+			}
+			
+			// Check file permissions on folder to moved out of
+			if( !fileWritable(element.object.path) ){
+				alert('This folder you\'re attempting to move out of is not writable.');
+				return;
+			}
+			
+			// Check file permissions on folder to be moved into
+			if( !fileWritable(this.path) ){
+				alert('This folder you\'re attempting to move into is not writable.');
+				return;
+			}
+			
 			
 			var params = $H({ 
 				relay: 'fileMove', 
@@ -780,6 +841,7 @@ File.prototype = {
 	
 	createFile: function () { 
 						
+						
 		this.element = document.createElement('div');
 		this.span =    document.createElement('span');
 		this.link =    document.createElement('a');
@@ -896,15 +958,25 @@ File.prototype = {
 				break;
 			
 			case 'downloadFile':
-				location.href = FC.URL+'?relay=getFilePackage&paths=' + this.path + '~' + this.name
+				location.href = FC.URL+'?relay=getFile&path=' + this.path + '/' + this.name
+				// location.href = FC.URL+'?relay=getFilePackage&paths=' + this.path + '~' + this.name
 				break;
 				
 			case 'renameFile':
-				if(!this.readonly){			
+				// DB readonly
+				if(!this.readonly){
+					
+					// Check file permissions
+					// Note circumventing this will not allow editing a write-protected file 
+					if( !fileWritable(this.path + '/' + this.name) ){
+						alert('This file is not writable.');
+						return;
+					}
+					
+						
 					var newName = prompt('Rename folder ' + this.name + ' to:', this.name)
 					if(newName && newName !== this.name){
 					
-
 						// Handle overwrite condition
 						if( fileExists(this.path + '/' + newName) ){
 							var overWrite = confirm('A file with that name already exists. Overwrite it?');
@@ -912,7 +984,7 @@ File.prototype = {
 								return false;
 							}
 						}
-
+						
 						var params = $H({ 
 							relay: 'fileRename', 
 							
@@ -940,6 +1012,15 @@ File.prototype = {
 				break;
 				
 			case 'deleteFile':
+			
+				// Check file permissions
+				// Note circumventing this will not allow editing a write-protected file 
+				if( !fileWritable(this.path + '/' + this.name) ){
+					alert('This file is not writable.');
+					return;
+				}
+			
+				// Database version of read-only. 
 				if(!this.readonly){
 					this.unlink();
 				}else{
@@ -1144,6 +1225,57 @@ File.prototype = {
 		this.parentObject.update();
 	}
 };
+
+
+function folderIsDeletable(path){
+	var params = {  
+		relay: 'folderIsDeletable', 
+		path: path
+	};
+	
+	// Prototype sucks. No async ajax.
+	var response = jQuery.ajax({
+		url: FC.URL,
+		type: "POST",
+		data: (params),
+		dataType: "json",
+		async: false
+	}).responseText;
+	
+	try{
+		var response = jQuery.parseJSON(response).bindings[0];
+	}catch(e){
+		alert('There seems to be a problem with the JSON response from the server.');
+	}
+	
+	return response.writable;
+}
+
+
+function fileWritable(path){
+	var params = {  
+		relay: 'fileIsWritable', 
+		path: path
+	};
+	
+	// Prototype sucks. No async ajax.
+	var response = jQuery.ajax({
+		url: FC.URL,
+		type: "POST",
+		data: (params),
+		dataType: "json",
+		async: false
+	}).responseText;
+	
+	try{
+		var response = jQuery.parseJSON(response).bindings[0];
+	}catch(e){
+		alert('There seems to be a problem with the JSON response from the server.');
+	}
+
+	return response.writable;
+}
+
 
 // Synchronous ajax call to determine if a path already exists on the server.
 function fileExists(path){
