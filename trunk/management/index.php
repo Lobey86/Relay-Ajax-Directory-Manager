@@ -703,7 +703,7 @@ table td { padding: 5px 10px; vertical-align:top;}
 
 <body>
 <div id="head">
-		<img src="../images/relaybeta.gif" class="logo" alt="Relay Beta" />
+		<img src="../images/relay.png" class="logo" alt="Relay Beta" />
 
 	
 		<ul id="nav">
