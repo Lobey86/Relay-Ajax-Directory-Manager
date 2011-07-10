@@ -629,10 +629,10 @@ function getThumb($path, $filename, $regen = false){
 				return false;
 			}
 			
-			$extension = array_pop($file);
+			$extension = strtolower( array_pop($file) );
 			$filenameBase = implode('.', $file);
 		
-			$thumbPath = $path . '/' . $thumbnailPrefix . $filenameBase . '.jpg';
+			$thumbPath = $path . '/' . $thumbnailPrefix . $filenameBase .'.'. $extension . '.jpg';
 								
 			if( !file_exists( localizePath($thumbPath) ) ){
 				thumbnail($path,  $filename);
@@ -645,7 +645,7 @@ function getThumb($path, $filename, $regen = false){
 			$thumb = file_get_contents( localizePath($thumbPath) );
 			header("Content-type:image/jpeg");
 			echo $thumb;
-		
+		 
 		}
 	}else{
 		// FIXME: error condition
@@ -662,7 +662,7 @@ function thumbnail($path, $filename){
 	$filenameBase = implode('.', $file);
 	
 	$srcImagePath = localizePath($path.'/'.$filename);
-	$thumbPath = localizePath($path.'/'. $thumbnailPrefix .$filenameBase . '.jpg');
+	$thumbPath = localizePath($path.'/'. $thumbnailPrefix .$filenameBase .'.'. $extension . '.jpg');
 	
 	$thumbsize = 192;
 	
