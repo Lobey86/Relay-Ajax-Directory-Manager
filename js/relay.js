@@ -1,3 +1,11 @@
+// Handle any errant console.log calls in browsers that can't handle it.
+if (typeof console == "undefined") {
+    window.console = {
+        log: function () {}
+    };
+}
+
+
 // 
 // $file1 = $srcImagePath;
 // $file2 = $srcImagePath .'temp';
@@ -23,16 +31,25 @@ var FC = {
 	DEBUG:false
 };
 
+
+
+
+
+
+
 // TODO: Directory and File should *ideally* be subclasses of the same class 
 // since they share so much similar functionality.
 var Directory = Class.create();
 Directory.prototype = {
 	
 	initialize: function (path, name, flag, parentElement, virtual, scheme, displayname) {
-		this.path = path; 		// "/filestore/folder2"
+
+		this.name = name; 						// "people"
+		this.path = path; 						// "/filestore/folder2"
+		this.fullPath = path + '/' + name; 		// "/filestore/folder2/people"
+		// FIXME: convert / to _ for html ids
+		this.id = this.fullPath; 			
 		this.type = 'directory';
-		this.name = name; 		// "people"
-		this.id = this.path; 	// "/filestore/folder2/people"
 		this.flag = flag;
 		this.virtual = virtual || false;
 		this.open = false;
@@ -46,7 +63,7 @@ Directory.prototype = {
 		this.parentElement = parentElement;
 		this.parentElement.object ? this.parentObject = this.parentElement.object :null;
 
-		if(scheme) this.readonly = (scheme == 'read');
+		if(scheme) this.readonly = (scheme == 'read'); // FIXME: WTF?
 		else if(this.parentObject) this.readonly = this.parentObject.readonly;
 		else this.readonly = true;
 		
@@ -116,6 +133,7 @@ Directory.prototype = {
 		if(!this.readonly ) {
 			this.dropdown.options.add( newFolderOpt );
 			this.dropdown.options.add( renameFolderOpt );
+
 			if(!this.virtual){
 				this.dropdown.options.add( deleteFolderOpt )
 			}		
@@ -165,6 +183,7 @@ Directory.prototype = {
 			this.span.style.display = "none";
 		};
 
+		
 		this.element.id = "root" + this.id;
 		this.element.object = this;
 		
@@ -214,6 +233,8 @@ Directory.prototype = {
 
 		// Fetch will recursively call itself when it finds a directory.	
 		function fetch(folderPath){
+			
+			
 			var params = $H({ 
 				relay: 'getFolder', 
 				path: folderPath 
@@ -233,7 +254,7 @@ Directory.prototype = {
 						if(item.type === 'file'){							
 							cart.addSpecial(item.path, item.name);
 						}else if(item.type === 'directory'){
-							fetch(item.path);
+							fetch(item.path +'/'+item.name);
 						};
 					};
 				},
@@ -260,15 +281,23 @@ Directory.prototype = {
 				break;
 			
 			case 'downloadFolder':
-				this.addDl(this.path);
+				this.addDl(this.fullPath);
 				break;
 				
 			case 'renameFolder':
 				if(!this.readonly){
 					
+					
+					
+					// Handle virtual directories nested in other virtual directories
+					if( folderIsVirtual(this.fullPath) ){
+						alert('This folder is a virtual directory and can not be renamed.');
+						return;
+					}
+					
 					// Check file permissions
 					// Note circumventing this will not allow editing a write-protected file 
-					if( !fileWritable(this.path) ){
+					if( !fileWritable(this.fullPath) ){
 						alert('This folder is not writable.');
 						return;
 					}
@@ -278,7 +307,7 @@ Directory.prototype = {
 					if(newName && newName !== this.name){
 						
 						// Handle overwrite condition
-						if( fileExists(this.parentElement.object.path + '/' + newName) ){
+						if( fileExists(this.parentElement.object.fullPath + '/' + newName) ){
 							var overWrite = confirm('A folder with that name already exists. Overwrite it?');
 							if(!overWrite){
 								return false;
@@ -295,13 +324,19 @@ Directory.prototype = {
 			case 'deleteFolder':
 				if(!this.readonly){
 					
-					if( !fileWritable(this.path) ){
+					// Handle virtual directories nested in other virtual directories
+					if( folderIsVirtual(this.fullPath) ){
+						alert('This folder is a virtual directory and can not be deleted.');
+						return;
+					}
+					
+					if( !fileWritable(this.fullPath) ){
 						alert('This folder is not writable.');
 						return;
 					}
 					
 					
-					if( !folderIsDeletable(this.path) ){
+					if( !folderIsDeletable(this.fullPath) ){
 						alert('This folder contains write-protected folders or files.');
 						return;
 					}
@@ -323,9 +358,10 @@ Directory.prototype = {
 	},
 	
 	getContents: function () {
+
 		if(this.opening) return false;
 		this.opening = true;
-		var params = $H({ relay: 'getFolder', path: this.path });
+		var params = $H({ relay: 'getFolder', path: this.fullPath });
 		this.showActivity();
 		var ajax = new Ajax.Request(FC.URL, {
 			onSuccess: this.getContents_handler.bind(this),
@@ -336,7 +372,10 @@ Directory.prototype = {
 	
 	},
 
-	getContents_handler: function (response) {		
+
+	getContents_handler: function (response) {	 
+		
+			
 		this.open = true;
 		Element.addClassName(this.span, 'open');
 		this.opening = false;
@@ -345,6 +384,10 @@ Directory.prototype = {
 		var json_data = response.responseText;
 		//eval("var jsonObject = ("+json_data+")");
 		var jsonObject = jQuery.parseJSON(json_data)
+
+
+
+
 		
 		if(jsonObject.bindings.length == 0) {
 			this.addBlank(); return true;
@@ -393,11 +436,23 @@ Directory.prototype = {
 		if (FC.NEXTPATH && !this.isRoot){
 			parsePath(FC.NEXTPATH);
 		};
+		
+	
 	},
 	
+	
+	
 	update: function(){
+		// Root won't be updated unless a hard refresh takes place.
+		// This only seems to matter if new virtual drives are created.
+		if(this.isRoot){
+			return;
+		}
+		
 		if (this.open){
-			var params = $H({ relay: 'getFolder', path: this.path });
+			// this.clearContents();
+			// this.getContents();
+			var params = $H({ relay: 'getFolder', path: this.fullPath });
 			this.showActivity();
 			var ajax = new Ajax.Request(FC.URL,{
 				onSuccess : this.update_handler.bind(this),
@@ -406,7 +461,8 @@ Directory.prototype = {
 				onFailure: function(){ showError(ER.ajax); }
 			});
 		}else{
-			this.getContents();
+			// FIXME: ?
+			//this.getContents();
 		};
 	},
 
@@ -414,7 +470,6 @@ Directory.prototype = {
 		this.hideActivity();
 		this.open = true;
 		var json_data = response.responseText; 
-		//eval("var jsonObject = ("+json_data+")");
 		var jsonObject = jQuery.parseJSON(json_data)
 				
 		if(jsonObject.bindings.length > 0){
@@ -423,10 +478,12 @@ Directory.prototype = {
 			this.addBlank();
 		};
 		
+		// Check existing children against JSON response... in an ugly way
 		for(var i=0; i < this.children.length; i++){
+					
 			var found = false;			
 			for (var j=0; j < jsonObject.bindings.length; j++){
-				if(this.children[i].id == jsonObject.bindings[j].id || this.children[i].id == jsonObject.bindings[j].path){
+				if(this.children[i].path == jsonObject.bindings[j].path && this.children[i].name == jsonObject.bindings[j].name){
 					found = true;
 					break;
 				};
@@ -526,17 +583,22 @@ Directory.prototype = {
 		if (element.object.parentObject == this) { return false; }
 		if ( element.object.type == 'directory' ) {
 			
+			
+			// Handle virtual directories nested in other virtual directories
+			if( folderIsVirtual(element.object.fullPath) ){
+				alert('This folder is a virtual directory and can not be moved.');
+				return;
+			}
+			
 			// Check file permissions on me
 			// Note circumventing this will not allow editing a write-protected file 
-			if( !fileWritable(element.object.path) ){
+			if( !fileWritable(element.object.fullPath) ){
 				alert('This folder is not writable.');
 				return;
 			}
 			
 			// Handle overwrite condition
-			if( fileExists(this.path + '/' + element.object.name) ){
-				
-				
+			if( fileExists(this.fullPath + '/' + element.object.name) ){
 				var overWrite = confirm('A folder with that name already exists there. Overwrite it?');
 				if(!overWrite){
 					return false;
@@ -546,8 +608,8 @@ Directory.prototype = {
 			var params = $H({ 
 				relay: 'folderMove', 
 				name: element.object.name,
-				path: element.object.parentObject.path, 
-				where: this.path
+				path: element.object.parentObject.fullPath, 
+				where: this.fullPath
 			});
 			
 			
@@ -567,7 +629,7 @@ Directory.prototype = {
 			
 			
 			// Handle overwrite condition
-			if( fileExists(this.path + '/' + element.object.name) ){				
+			if( fileExists(this.fullPath + '/' + element.object.name) ){				
 				var overWrite = confirm('A file with that name already exists there. Overwrite it?');
 				if(!overWrite){
 					return false;
@@ -575,30 +637,29 @@ Directory.prototype = {
 			}
 			
 			// Check file permissions on file to be moved
-			if( !fileWritable(element.object.path + '/' + element.object.name) ){
+			if( !fileWritable(element.object.fullPath) ){
 				alert('This file is not writable.');
 				return;
 			}
 			
 			// Check file permissions on folder to moved out of
-			if( !fileWritable(element.object.path) ){
+			if( !fileWritable(element.object.parentObject.fullPath) ){
 				alert('This folder you\'re attempting to move out of is not writable.');
 				return;
 			}
 			
 			// Check file permissions on folder to be moved into
-			if( !fileWritable(this.path) ){
+			if( !fileWritable(this.fullPath) ){
 				alert('This folder you\'re attempting to move into is not writable.');
 				return;
 			}
-			
 			
 			var params = $H({ 
 				relay: 'fileMove', 
 				path: element.object.path,
 				filename: element.object.name,
 				id: element.object.id,
-				where: this.path 
+				where: this.fullPath 
 			});
 			FC.SEARCHOBJ = this;
 			FC.NEXTPATH = '/'+ element.object.name;
@@ -673,10 +734,10 @@ Directory.prototype = {
 			this.selected = false; 
 			this.clearRename();
 	},
-	  
+	 
 	getMeta: function () {
 		$('meta').prevElement = this.path;
-		var params = $H({ relay: 'getFolderMeta', path: this.path });
+		var params = $H({ relay: 'getFolderMeta', path: this.fullPath });
 		var ajax = new Ajax.Request(FC.URL,{
 			onLoading: showMetaSpinner(), 
 			onSuccess: this.getMeta_handler.bind(this),
@@ -734,7 +795,7 @@ Directory.prototype = {
 		if (charCode == Event.KEY_RETURN || direct) {
 			var params = $H({ 
 				relay : 'folderRename', 
-				path  : this.parentObject.path, 
+				path  : this.parentObject.fullPath, 
 				name  : this.name, 
 				newname: direct || this.newName.value });
 			this.link.innerHTML = params.newname;
@@ -784,9 +845,15 @@ Directory.prototype = {
 		if(this.readonly) return false;
 		if(this.virtual) return false;
 
-		if(confirm('Delete the folder '+this.name+ '?')) {			
-			var params = $H({ relay: 'folderDelete', folder: this.path });
+		if(confirm('Delete the folder '+this.name+ '?')){
+						
+			var params = $H({ 
+				relay: 'folderDelete', 
+				folder: this.fullPath
+			});
+			
 			this.parentObject.prevChild(this);
+			
 			var ajax = new Ajax.Request(FC.URL,{
 				onComplete: this.parentObject.nextChild(this),
 				onSuccess: this.clear.bind(this),
@@ -830,7 +897,8 @@ File.prototype = {
 		this.flag = flag;
 		this.selected = false;
 		this.timer = null;
-		this.path = optPath || parentElement.object.path; // "/filestore/people" 
+		this.path = optPath || parentElement.object.fullPath; // "/filestore/people" 
+		this.fullPath = this.path + '/' + this.name;
 		this.interval = 1000;
 		this.parentElement = parentElement;
 		this.parentObject = parentElement.object;
@@ -968,8 +1036,14 @@ File.prototype = {
 					
 					// Check file permissions
 					// Note circumventing this will not allow editing a write-protected file 
-					if( !fileWritable(this.path + '/' + this.name) ){
+					if( !fileWritable(this.fullPath) ){
 						alert('This file is not writable.');
+						return;
+					}
+					
+					// Check parent's permissions
+					if( !fileWritable(this.parentObject.fullPath) ){
+						alert('This file\'s parent directory is not writable.');
 						return;
 					}
 					
@@ -1015,8 +1089,14 @@ File.prototype = {
 			
 				// Check file permissions
 				// Note circumventing this will not allow editing a write-protected file 
-				if( !fileWritable(this.path + '/' + this.name) ){
+				if( !fileWritable(this.fullPath) ){
 					alert('This file is not writable.');
+					return;
+				}
+				
+				// Check parent's permissions
+				if( !fileWritable(this.parentObject.fullPath) ){
+					alert('This file\'s parent directory is not writable.');
 					return;
 				}
 			
@@ -1059,6 +1139,8 @@ File.prototype = {
 				return;
 			};
 		};
+		
+
 		
 		$('uploadPath').value = this.parentObject.path;
 		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.parentObject.path;
@@ -1226,6 +1308,30 @@ File.prototype = {
 	}
 };
 
+
+function folderIsVirtual(path){
+	var params = {  
+		relay: 'folderIsVirtual', 
+		path: path
+	};
+	
+	// Prototype sucks. No async ajax.
+	var response = jQuery.ajax({
+		url: FC.URL,
+		type: "POST",
+		data: (params),
+		dataType: "json",
+		async: false
+	}).responseText;
+	
+	try{
+		var response = jQuery.parseJSON(response).bindings[0];
+	}catch(e){
+		alert('There seems to be a problem with the JSON response from the server.');
+	}
+	
+	return response.virtual;
+}
 
 function folderIsDeletable(path){
 	var params = {  
@@ -1487,7 +1593,8 @@ function newFolder(){
 	FC.NEXTPATH = '/'+folderName;
 	FC.SEARCHOBJ = c;
 	
-	var params = $H({ relay: 'newFolder', name: folderName, path: c.path });
+	
+	var params = $H({ relay: 'newFolder', name: folderName, path: c.fullPath });
 	var ajax = new Ajax.Request(FC.URL,{
 		onSuccess: setTimeout("c.update()",100),
 		method: 'post', 
@@ -1625,7 +1732,9 @@ function download() {
 
 function updateAll(obj) {
 	if(obj.open && obj.type=='directory'){
-		for(i in obj.children) { updateAll(obj.children[i]); }
+		for(i in obj.children) {
+			updateAll(obj.children[i]); 
+		}
 		obj.update();
 	}
 }
@@ -1766,7 +1875,7 @@ Cart.prototype = {
 		}
 	},
 	
-	download: function() {
+	getCardIds: function(){
 		if(this.children.length == 0 && FC.SELECTEDOBJECT == null) return false;
 		if(this.children.length == 0 && FC.SELECTEDOBJECT) { FC.SELECTEDOBJECT.download(); return false; }
 		var cartIDs = '';
@@ -1781,14 +1890,20 @@ Cart.prototype = {
 			Element.remove('c'+this.children[i]);
 		}
 		this.children = new Array();
-
-		if($('emailFormTo').value != '' && $('emailFormTo').value != 'Type email address') 
-			this.email(cartIDs);
-		else
-			location.href = FC.URL+'?relay=getFilePackage&paths=' + cartIDs;
+		
+		return cartIDs;
 	},
 	
-	email: function(cartIDs) {
+	download: function() {
+		var cartIDs = this.getCardIds();
+
+		location.href = FC.URL+'?relay=getFilePackage&paths=' + cartIDs;
+	},
+	
+	email: function() {
+		
+		var cartIDs = this.getCardIds();
+		
 		var params = $H({
 			relay: 'emailFilePackage', 
 			to: $('emailFormTo').value, 

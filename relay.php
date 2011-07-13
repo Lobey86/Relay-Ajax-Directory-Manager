@@ -68,7 +68,11 @@ if($resource != true){
 					getFolderMeta($_POST['path']);
 				} 
 				break;
-				
+				case "folderIsVirtual":
+					if(isset($_POST['path'])){
+						folderIsVirtual($_POST['path']);
+					} 
+					break;
 			case "fileIsWritable":
 				if(isset($_POST['path'])){
 					fileIsWritable($_POST['path']);
@@ -161,17 +165,50 @@ if($resource != true){
 // Utility Methods
 // ***************************************************************************
 
+// Takes an array of paths and returns a condensed array of paths, removing 
+// any nested folders
+//
+// example:
+// condensePathsArray( array('c/d/e','c/d','c/x/y') )
+// returns ('c/d', 'c/x/y')
+function condensePathsArray($arr){
+	// Remove items with same beginnings
+	for ($i=0; $i < count($arr); $i++) {
+	$whoimcheckingfor = $arr[$i];
+
+		for($j=0; $j < count($arr); $j++){
+			$whoimchecking = $arr[$j];
+			if( startsWith($whoimchecking, $whoimcheckingfor) && $whoimchecking != $whoimcheckingfor){
+				unset($arr[$j]);
+			}
+		}
+
+	}
+
+	//Remove identical items
+	return array_unique($arr);
+}
+
 // Checks existance of file/folder
 function fileExists($path){
 	logAction('exists', $path);
+	
 	jsonStart();
+	
+	if( permForPath($path, 'view') ){
+
+		if( file_exists( $path ) ){
+			jsonAdd("\"exists\": true  ");
+		}else{
+			jsonAdd("\"exists\": false  ");
+		}
+
+		echo jsonReturn('exists');		
 		
-	if( file_exists( localizePath($path) ) ){
-		jsonAdd("\"exists\": true  ");
 	}else{
-		jsonAdd("\"exists\": false  ");
+		error('You do not have permission for this action.');
 	}
-	echo jsonReturn('exists');
+	
 }
 
 // Legacy Method
@@ -289,7 +326,7 @@ function directoryToArray($directory, $recursive) {
 	//	)
 	
     $array_items = array();
-    if ($handle = opendir( localizePath($directory))) {
+    if ( $handle = opendir($directory) ){
         while (false !== ($file = readdir($handle))) {
             if ($file != "." && $file != "..") {
                 if (is_dir($directory. "/" . $file)) {
@@ -321,6 +358,7 @@ function directoryToArray($directory, $recursive) {
 
 // Emails zip file from contents of $paths argument.
 function emailFilePackage($paths,$to,$from,$message){
+	
 		$fileids = preg_split("/\,/",$fileids);
 	
 		$boundary = "DU_" . md5(uniqid(time()));	
@@ -382,8 +420,8 @@ function getFilePackage($paths, $returnContent = false){
 	foreach($files as $file){
 		$filePath = $file['path'] . '/' . $file['filename'];
 		
-		if( file_exists( localizePath($filePath) ) ){
-			$createZip -> addFile( file_get_contents( localizePath($filePath) ), $file['filename']);
+		if( file_exists($filePath) ){
+			$createZip -> addFile( file_get_contents($filePath), $file['filename']);
 			$fileCount++;
 		}
 	}
@@ -410,23 +448,30 @@ function getFilePackage($paths, $returnContent = false){
 
 // Legacy Method
 function upload($dir){
-	if(getUserAuth('upload',$dir)){
-		$userpath = getUserPath($dir).$dir;
+	
+	if( permForPath($dir, 'write') ){
+		
+		if(getUserAuth('upload',$dir)){
+			$userpath = getUserPath($dir).$dir;
 
-		$tmp_name = $_FILES["upload"]["tmp_name"];
-		$uploadfile = basename($_FILES['upload']['name']);
-		$i=1;
-		while(file_exists($userpath.'/'.$uploadfile)){
-		    $uploadfile = $i . '_' . basename($_FILES['upload']['name']);
-		    $i++;
+			$tmp_name = $_FILES["upload"]["tmp_name"];
+			$uploadfile = basename($_FILES['upload']['name']);
+			$i=1;
+			while(file_exists($userpath.'/'.$uploadfile)){
+			    $uploadfile = $i . '_' . basename($_FILES['upload']['name']);
+			    $i++;
+			}
+
+			move_uploaded_file($tmp_name, $userpath.'/'.$uploadfile);
 		}
 
-		move_uploaded_file($tmp_name, $userpath.'/'.$uploadfile);
+		if(isset($_GET['redir'])){
+			header("location: $_GET[redir]");
+		}		
+		
+	}else{
+		error('You do not have permission for this action.');
 	}
-	
-	if(isset($_GET['redir'])){
-		header("location: $_GET[redir]");
-	}	
 }
 
 // Legacy Method
@@ -598,6 +643,10 @@ function jsonAdd($jsonLine){
 
 function jsonReturn($variableName){
   global $json;
+
+	logAction('jsonReturn', $json);
+	
+
   return "{\"bindings\": [ $json ]}";
 }
 
@@ -611,15 +660,23 @@ function error($message){
 // Thumbnail Methods
 // ***************************************************************************
 
+
 // Retrieve thumbnail, creates one if needed.
 function getThumb($path, $filename, $regen = false){
 	global $thumbnailPrefix;
 
+	if( !permForPath($path, 'read') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
+
 	$srcImagePath = $path.'/'.$filename;
 		
-	if( file_exists( localizePath($srcImagePath) ) ){	
-		
-		if( getUserAuth('view', $path) ){
+	if( file_exists( $srcImagePath ) ){	
+
+		// FIXME: USER AUTH		
+		//if( getUserAuth('view', $path) ){
 			
 			logAction('getThumb', $path . '/' .$filename);
 	    
@@ -634,7 +691,7 @@ function getThumb($path, $filename, $regen = false){
 		
 			$thumbPath = $path . '/' . $thumbnailPrefix . $filenameBase .'.'. $extension . '.jpg';
 								
-			if( !file_exists( localizePath($thumbPath) ) ){
+			if( !file_exists( $thumbPath ) ){
 				thumbnail($path,  $filename);
 			}
 		
@@ -642,11 +699,11 @@ function getThumb($path, $filename, $regen = false){
 				return;
 			}
 		
-			$thumb = file_get_contents( localizePath($thumbPath) );
+			$thumb = file_get_contents( $thumbPath );
 			header("Content-type:image/jpeg");
 			echo $thumb;
 		 
-		}
+		//}
 	}else{
 		// FIXME: error condition
 	}
@@ -655,14 +712,17 @@ function getThumb($path, $filename, $regen = false){
 // Creates a thumbnail of the provided image and stores it in /thumbnails
 function thumbnail($path, $filename){
 	
+	logAction('thumbnail', $path . '/' .$filename);
+	
+	
 	global $thumbnailPrefix, $ghostScript;
 	
 	$file = explode('.', $filename);
 	$extension = strtolower( array_pop($file) );
 	$filenameBase = implode('.', $file);
 	
-	$srcImagePath = localizePath($path.'/'.$filename);
-	$thumbPath = localizePath($path.'/'. $thumbnailPrefix .$filenameBase .'.'. $extension . '.jpg');
+	$srcImagePath = $path.'/'.$filename;
+	$thumbPath = $path.'/'. $thumbnailPrefix .$filenameBase .'.'. $extension . '.jpg';
 	
 	$thumbsize = 192;
 	
@@ -689,8 +749,8 @@ function thumbnail($path, $filename){
 		$deletefile = $file2;
 	}
 	
-	if( file_exists( localizePath($deletefile) ) ){
-		unlink(localizePath($deletefile));
+	if( file_exists( $deletefile ) ){
+		unlink($deletefile);
 	}
 	
 	// Set thumbnail dimensions	
@@ -721,26 +781,65 @@ function thumbnail($path, $filename){
 	ob_end_clean(); 
 }
 
+
+
+
+
+
+
+
 // Creates thumbnails for all images, deleting all old thumbs
 function regenerateThumbs(){
-	global $thumbnailPrefix;
+	global $thumbnailPrefix, $database;
 	
-	// Spawn new thumbs
-	$filestructure = directoryToArray('filestore', true);
-	foreach ($filestructure as $item) {
+
+	// Get all virt. dirs
+	$query = "select * from $GLOBALS[tablePrefix]clients";
+	$response = mysql_query($query, $database);
 	
-		$name = $item['name'];
-		$type = $item['type'];
-		$path = '/' . $item['path'];
+	
+	// Put all virt. directory paths into an array
+	$dirs = array();
+	while( $client = mysql_fetch_assoc($response) ){
+		$folder = $client['path'].'/'.$client['name'];
 		
-		if($type == 'file'){
-			if( startsWith($name, $thumbnailPrefix) ){
-				unlink( localizePath($path) .'/'. $name  );
-			}
-			
-			getThumb($path, $name, true);	
-		}
+		$dirs[] = $folder;
 	}
+	
+	// Remove any nested virt. directories 
+	$conDirs = condensePathsArray($dirs);
+
+	// Regen thumbs for each virt. directory
+	foreach($conDirs as $folder){
+
+		logAction('regen folder', $folder);
+
+		$filestructure = directoryToArray($folder, true);
+		foreach ($filestructure as $item) {
+ 
+			$name = $item['name'];
+			$type = $item['type'];
+			$path = '/' . $item['path'];
+
+			if($type == 'file'){
+				// Remove pre-existing thumb
+				if( startsWith($name, $thumbnailPrefix) ){
+					unlink($path.'/'.$name);
+				}
+
+				getThumb($path, $name, true);	
+			}
+		}
+		
+	}
+
+
+		
+
+	
+	
+	
+	
 }
 
 
@@ -751,26 +850,21 @@ function regenerateThumbs(){
 
 // Gets folder contents
 function getFolder($path){
-	
-	// All virtual Directories code is legacy
-	
-	global $database,$resource,$dateFormat, $thumbnailPrefix;
+	global $database, $resource, $dateFormat, $thumbnailPrefix;
+
 	userPermissions();
 	$output = '';
 	jsonStart();
 	$path = mysql_escape_string($path);
 
-	// For Virtual Directories ===============================================
+
+	// Get virtual directories ===============================================
 	if($path == '' || $path == '/'){
 
 		// Get permissions for folders?
 		$query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" and $GLOBALS[tablePrefix]clients.name =\"$_SESSION[user]\" order by display";
 		$result = mysql_query($query,$database);
-		
-		// Build JSON for Virt Directories
-		while($clients = mysql_fetch_assoc($result))
-			$output .=  jsonAdd("\"displayname\":\"$clients[display]\",\"scheme\":\"$clients[scheme]\",\"type\": \"directory\", \"name\": \"$clients[name]\", \"path\": \"/$clients[name]\",\"virtual\":\"true\"");
-			
+
 		// ????
 		$query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" and $GLOBALS[tablePrefix]clients.name !=\"$_SESSION[user]\" order by display";
 		$result = mysql_query($query,$database);
@@ -786,7 +880,23 @@ function getFolder($path){
 			}
 			
 			while($clients = mysql_fetch_assoc($result)) { 
-			        $output .=  jsonAdd("\"displayname\":\"$clients[display]\",\"scheme\":\"$clients[scheme]\",\"type\": \"directory\", \"name\": \"$clients[name]\", \"path\": \"/$clients[name]\",\"virtual\":\"$virtual\"");
+				
+				
+				$displayName = $clients[display];
+				$scheme = $clients[scheme];
+				$name = $clients[name];
+								
+				$q = "select * from $GLOBALS[tablePrefix]clients where name=\"$name\" ";
+				$res = mysql_query($q, $database);
+				
+				$path = '';
+				
+				while( $c = mysql_fetch_assoc($res) ){
+					$path = $c['path'];
+				}
+				
+				$output .=  jsonAdd("\"displayname\":\"$displayName\",\"scheme\":\"$scheme\",\"type\": \"directory\", \"name\": \"$name\", \"path\": \"$path\",\"virtual\":\"$virtual\"");
+
 			}
 		}
 		$output .= jsonReturn('getFolder');
@@ -802,19 +912,25 @@ function getFolder($path){
 	}	
 	
 	// Non Virtual Directories ===============================================
-	if(getUserAuth('view',$path)){
-		
-		logAction('list',$path);
+
+		//logAction('list',$path);
 		$fullpath = getUserPath($path).$path;
 
 		if (is_dir($fullpath)) {
+						
+			if( !permForPath($path, 'read') ){
+				jsonStart();
+				error('You do not have permission for this action.');
+				return false;
+			}
+			
 			if ($dh = opendir($fullpath)) {
 				while (($file = readdir($dh)) !== false) {
 
 					if($file != '.' && $file != '..'){
 
 						if(filetype($fullpath . '/' . $file) == 'dir'){
-							jsonAdd("\"type\": \"directory\", \"name\": \"$file\", \"path\": \"$path/$file\""); 
+							jsonAdd("\"type\": \"directory\", \"name\": \"$file\", \"path\": \"$path\""); 
 						}else{
 							// Ignore hidden .files
 							if (!startsWith($file,'.') && !startsWith($file,$thumbnailPrefix)) {
@@ -842,51 +958,56 @@ function getFolder($path){
 		else
 			return $output;
   
-	}else{
-		error('no auth to view');
-	}
+	// }else{
+	// 	error('no auth to view');
+	// }
 }
 
 // Gets metadata for a directory
-function getFolderMeta($path){
+function getFolderMeta($path){ //=============================================
 	jsonStart();
+	
 	$path = mysql_escape_string($path);
-	if(getUserAuth('view',$path)){		
-		$fullpath = getUserPath($path).$path;
-		$size = filesize_format(get_size($fullpath));
-		$name = basename($fullpath);
+	
+	// FIXME: USER AUTH
+	//if(getUserAuth('view',$path)){		
+		$size = filesize_format(get_size($path));
+		$name = basename($path);
 		jsonAdd("\"name\": \"$name\", \"size\": \"$size\"");
 		echo jsonReturn('getFolderMeta');
-	}else{
-		error('access denied');
-	}
+	// }else{
+	// 	error('access denied');
+	// }
 }
 
 // Renames directory & upates DB records
 function folderRename($path,$name,$newname){
 	global $database;
 
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
+
 	$currPath = $path . '/' . $name; 
 	$newPath  = $path . '/' . $newname;
 	
-	if( is_dir( localizePath($currPath) ) ){
+	if( is_dir($currPath) ){
 		
-	    if(getUserAuth('folderRename',$path)){
-		
-			logAction('folderRename exists', $currPath);
-			logAction('folderRename exists', $newPath);
+		// FIXME: user auth
+	    //if(getUserAuth('folderRename',$path)){
 
 			// Remove original if it exists
-			if( is_dir( localizePath($newPath) ) ){
-				folderDelete( localizePath($newPath) );			
+			if( is_dir($newPath) ){
+				folderDelete($newPath);			
 			}
 
-			if( rename( localizePath($currPath), localizePath($newPath) ) ){
+			if( rename($currPath, $newPath) ){
 			
 				// Handle file metadata records
 				$query = "select * from $GLOBALS[tablePrefix]filesystem where rpath like \"$currPath%\"";
 				$result = mysql_query($query,$database);
-			
 			
 				if(mysql_num_rows($result) > 0){
 
@@ -902,16 +1023,17 @@ function folderRename($path,$name,$newname){
 						$query = "update $GLOBALS[tablePrefix]filesystem set filename=\"$newFilename\", rpath=\"$newPath\" where rpath=\"$oldPath\" and filename=\"$oldFilename\" ";
 						mysql_query($query,$database); 
 					}
-
-					logAction('folderRename', $currPath . ' to ' .$newPath); 	
 				}
-	
+
+				logAction('folderRename', $currPath . ' to ' .$newPath);
 			}else{
+				// FIXME: handle error
 				error('Rename failed');
 			}
 			
-		}
+		//}
 	}else{
+		// FIXME: handle error
 		error('Directory doesn\'t exist');
 	}
 }
@@ -920,20 +1042,26 @@ function folderRename($path,$name,$newname){
 function folderMove($name, $path, $where){
 	global $database;
 
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
+
 	$currPath = $path . '/' . $name; 
 	$newPath  = $where . '/' . $name;
 	
-	if( is_dir( localizePath($currPath) ) ){
+	if( is_dir( $currPath ) ){
 
-		if(getUserAuth('folderMove',$path)){
+		//if(getUserAuth('folderMove',$path)){
 
 
 			// Remove original if it exists
-			if( is_dir( localizePath($newPath) ) ){
-				folderDelete( localizePath($newPath) );			
+			if( is_dir($newPath) ){
+				folderDelete( $newPath );			
 			}
 
-			if( rename( localizePath($currPath), localizePath($newPath) ) ){
+			if( rename($currPath, $newPath) ){
 			
 				// Handle file metadata records
 				$query = "select * from $GLOBALS[tablePrefix]filesystem where rpath like \"$currPath%\"";
@@ -961,65 +1089,97 @@ function folderMove($name, $path, $where){
 				error('Move failed');
 			}
 		
-		}
+		//}
 	}else{
 		error('Directory doesn\'t exist');
 	}
 }
 
+function folderIsVirtual($path, $rtn=false){
+	$path = mysql_escape_string($path);	
+	global $database;
+	
+	$tmp = explode('/', $path);
+	$name = array_pop($tmp);
+	$tPath = implode('/', $tmp);
+	
+	$query = "select * from $GLOBALS[tablePrefix]clients where path=\"$tPath\" and name=\"$name\" ";	
+	$result = mysql_query($query, $database);
+	
+	$isVirt = false;
+	if(mysql_num_rows($result) > 0){
+		$isVirt = true;
+	}
+
+	if($rtn){
+		return $isVirt;
+	}else{
+		$isVirt = $isVirt ? 'true' : 'false'; 
+		jsonStart();
+		jsonAdd("\"virtual\": $isVirt ");
+		echo jsonReturn('folderIsVirtual');
+	}
+	
+	
+}
+
 // Deletes a directory and all files/file records within it
+// ===========================================================================
 function folderDelete($path){
 	global $database;
+	$path = mysql_escape_string($path);	
 
-	$path = mysql_escape_string($path);
-	$deleteDir = getUserPath($path).$path;
-
-    if(getUserAuth('folderDelete',$path)){
-	
-		//fileIsWritable($path, $rtn = false)
-	
-
-		logAction('delete',	$deleteDir);
-
-		if(deleteDir($deleteDir)){
-			// Remove db records
-			$query = "delete from $GLOBALS[tablePrefix]filesystem where rpath like \"$path%\"";
-			$result = mysql_query($query,$database);
-			logAction('folderDelete', $path);
-		}else{
-			echo "oops somethings wrong";
-		}
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
 	}
+	
+	//fileIsWritable($path, $rtn = false)
+
+	if(deleteDir($path)){
+		// Remove db records
+		$query = "delete from $GLOBALS[tablePrefix]filesystem where rpath like \"$path%\"";
+		$result = mysql_query($query,$database);
+		logAction('folderDelete', $path);
+	}else{
+		// FIXME: handle error condition
+		echo "oops somethings wrong";
+	}
+
 } 
 
 // Creates a new (physical) directory
+// ===========================================================================
 function newFolder($name, $path){
-	// Not rewritten
-
 	$name = mysql_escape_string($name);
 	$path = mysql_escape_string($path);
+	$fullPath = $path.'/'.$name;
 
-	$fullpath = getUserPath($path).$path.'/'.$name;
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
 
-	if(getUserAuth('newFolder',$path)){
-		logAction('newFolder',$path.'/'.$name);
+	if( is_dir($path) ){
+
 
 		$i = 1;
 		$append = "";
 
-		while(is_dir($fullpath.$append)){
+		while( is_dir($fullPath.$append) ){
 			$append = " $i";
 			$i++;
 		}
 
-		if(mkdir($fullpath.$append)){
-			echo "ok";
-		}else{
-			echo "oops somethings wrong";
-		}
 
-	}else{
-		error('new folder');
+		if( mkdir($fullPath.$append) ){
+			logAction('newFolder', $fullPath);
+		}else{
+			// FIXME: handle error condition
+			error('new folder');
+		}
 	}
 }
 
@@ -1029,7 +1189,14 @@ function folderIsDeletable($path, $rtn = false){
 	logAction('folderIsDeletable', $path);
 	jsonStart();
 
-	if( file_exists( localizePath($path) ) ){
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		jsonAdd("\"writable\": false ");
+		echo jsonReturn('folderIsDeletable');
+		return false;
+	}
+
+	if( is_dir($path) ){
 
 		$filestructure = directoryToArray($path, true);
 		$writable = true;
@@ -1039,7 +1206,7 @@ function folderIsDeletable($path, $rtn = false){
 			$type = $item['type'];
 			$path = '/' . $item['path'];
 
-			if( !fileIsWritable(localizePath($path .'/'. $name), true) ){
+			if( !fileIsWritable($path .'/'. $name, true) ){
 				$writable = false;
 			}
 		}
@@ -1068,13 +1235,21 @@ function folderIsDeletable($path, $rtn = false){
 
 // Determines if file writable.
 function fileIsWritable($path, $rtn = false){
+	
 	logAction('fileIsWritable', $path);
+	
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
 	
 	jsonStart();
 	
-	if( file_exists( localizePath($path) ) ){
-		$permissions = substr( decoct( fileperms( localizePath($path) ) ), -3);
-		$permissions += 0;
+	if( file_exists($path) ){
+		
+		$permissions = substr( decoct( fileperms( $path ) ), -3);
+		$permissions += 0; // Cast as int
 		$writable = ($permissions > 640)? true: false; 
 
 		if($rtn){
@@ -1100,6 +1275,12 @@ function fileIsWritable($path, $rtn = false){
 function fileRename($path, $filename, $id, $newName){
 	global $database, $thumbnailPrefix;
 
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
+
 	$path = str_replace("//","/",$path);
 	$path = str_replace("..","",$path);
 	$newName = str_replace("//","/",$newName);
@@ -1110,12 +1291,13 @@ function fileRename($path, $filename, $id, $newName){
 	$filePath = $path . '/' . $filename;
 	$newPath = $path . '/' . $newName;
 	
-	if( file_exists( localizePath($filePath) ) ){
+	if( file_exists( $filePath ) ){
 	
-		if( getUserAuth('rename',$path) ){
+		// FIXME: user auth
+		//if( getUserAuth('rename',$path) ){
 	
 			// Remove original if it exists
-			if( file_exists( localizePath($newPath) ) ){
+			if( file_exists( $newPath ) ){
 				$id = $newPath;
 				$id = str_replace("/","_",$id);
 				$id = str_replace(".","_",$id);
@@ -1123,7 +1305,7 @@ function fileRename($path, $filename, $id, $newName){
 			}
 	
 			// Image
-			rename(localizePath($filePath), localizePath($newPath));
+			rename($filePath, $newPath);
 
 			// Thumbnail
 			$tmp = explode('.', $filename);
@@ -1136,17 +1318,17 @@ function fileRename($path, $filename, $id, $newName){
 				$oldImageBasename = implode('.', $tmp);
 			} 
 			
-			$oldThumbPath = $path . '/' .$thumbnailPrefix.  $oldImageBasename . '.jpg';
-			$newThumbPath = $path . '/' .$thumbnailPrefix.  $newImageBasename . '.jpg';
+			$oldThumbPath = $path . '/' .$thumbnailPrefix.  $oldImageBasename .'.'.$oldImageExtension.'.jpg';
+			$newThumbPath = $path . '/' .$thumbnailPrefix.  $newImageBasename .'.'.$oldImageExtension.'.jpg';
 
-			if( file_exists( localizePath($oldThumbPath) ) ){
+			if( file_exists( $oldThumbPath ) ){
 				
 				// Remove any existing thumbnail by same name
-				if( file_exists( localizePath($newThumbPath) ) ){
-					fileDelete( localizePath($newThumbPath) );
+				if( file_exists($newThumbPath) ){
+					fileDelete($newThumbPath);
 				}
 				
-				rename( localizePath($oldThumbPath), localizePath($newThumbPath) );
+				rename($oldThumbPath, $newThumbPath);
 			}
 
 			// Handle any DB records
@@ -1163,10 +1345,10 @@ function fileRename($path, $filename, $id, $newName){
 			}
 
 			// Rename file
-			rename(localizePath($filePath), localizePath($newPath));
+			rename($filePath, $newPath);
 			logAction('fileRename', $filePath . ' to ' . $newPath);
 
-		}
+		//}
 	}
 }
 
@@ -1174,9 +1356,18 @@ function fileRename($path, $filename, $id, $newName){
 function getFile($path){
 	logAction('getFile',$path);
 
-	if( file_exists( localizePath($path) ) ){
-		if( getUserAuth('view',$path) ){		
-			$localPath = localizePath($path);
+
+	if( !permForPath($path, 'read') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
+
+	// FIXME: user auth
+
+	if( file_exists($path) ){
+		//if( getUserAuth('view',$path) ){		
+		
 		
 			header("Pragma: public"); 
 			header("Expires: 0");
@@ -1184,11 +1375,11 @@ function getFile($path){
 			header("Cache-Control: private",false); 
 			//header("Content-type: $fileinfo[type]");
 			header("Content-Transfer-Encoding: Binary");
-			header("Content-length: ".filesize($localPath));
-			header("Content-disposition: attachment; filename=\"".basename($localPath)."\"");
-			readfile("$localPath");
+			header("Content-length: ".filesize($path));
+			header("Content-disposition: attachment; filename=\"".basename($path)."\"");
+			readfile("$path");
 		
-		}
+		//}
 	}
 }
 
@@ -1196,25 +1387,32 @@ function getFile($path){
 function fileDelete($path, $filename, $id){
 	global $database, $thumbnailPrefix;
 
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
+
 	$filePath = $path . '/' . $filename;
 	
-	if( file_exists( localizePath($filePath) ) ){
+	if( file_exists($filePath) ){
 
-		if( getUserAuth('view',$path) ){
+		// FIXME: user auth
+		//if( getUserAuth('view',$path) ){
 				
 			logAction('fileDelete', $filePath);
 		
 			// Image
-			unlink( localizePath($filePath) );
+			unlink($filePath);
 		
 			$tmp = explode('.', $filename);
 			$imageExtension = array_pop($tmp);
 			$imageBasename = implode('.', $tmp);
 		
 			// Thumbnail
-			$thumbPath = $path . '/' .$thumbnailPrefix. $imageBasename . '.jpg';
-			if( file_exists( localizePath($thumbPath) ) ){
-				unlink( localizePath($thumbPath) );
+			$thumbPath = $path . '/' .$thumbnailPrefix. $imageBasename.'.'.$imageExtension. '.jpg';
+			if( file_exists( $thumbPath) ){
+				unlink( $thumbPath );
 			}
 
 			// Database
@@ -1226,13 +1424,19 @@ function fileDelete($path, $filename, $id){
 				mysql_query($query,$database);
 				logAction('fileDelete', 'Deleting metadata: ' . $filePath);
 			}
-		}
+		//}
 	}
 }
 
 // Moves file and updates any database records
 function fileMove($path, $filename, $id, $where){
 	global $database, $thumbnailPrefix;
+
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
 
 	$path = str_replace("//","/",$path);
 	$path = str_replace("..","",$path);
@@ -1244,66 +1448,58 @@ function fileMove($path, $filename, $id, $where){
 	$filePath = $path . '/' . $filename;
 	$newPath = $where . '/' . $filename;
 	
-	if( file_exists( localizePath($filePath) ) ){
+	if( file_exists($filePath) ){
 
-		if(getUserAuth('move',$path) && getUserAuth('move',$where)){
-	
-			if( is_dir( localizePath($where) ) ){
+		if( is_dir($where) ){
 
-				// Remove original if it exists
-				if( file_exists( localizePath($newPath) ) ){
-					$id = $newPath;
-					$id = str_replace("/","_",$id);
-					$id = str_replace(".","_",$id);
-					fileDelete($where, $filename, $id);			
-				}
-
-				// Handle any DB records
-				$query = "select * from $GLOBALS[tablePrefix]filesystem where rpath=\"$path\" and filename=\"$id\"";
-				$result = mysql_query($query,$database);
-						
-				if(mysql_num_rows($result) > 0){
-					$newId = str_replace("/","_",$newPath);
-					$newId = str_replace(".","_",$newId);
-
-					$query = "update $GLOBALS[tablePrefix]filesystem set rpath=\"$where\", filename=\"$newId\" where rpath=\"$path\" and filename=\"$id\" ";
-					mysql_query($query,$database);
-					logAction('fileMove', 'Updating metadata');
-				}
-
-				// Rename file
-				rename(localizePath($filePath), localizePath($newPath));
-				
-				
-				// Thumbnail
-				$tmp = explode('.', $filename);
-				$oldImageExtension = array_pop($tmp);
-				$oldImageBasename = implode('.', $tmp);
-
-				$tmp = explode('.', $newName);
-				$newImageExtension = array_pop($tmp);
-				$newImageBasename = implode('.', $tmp);
-
-				$oldThumbPath = $path . '/' .$thumbnailPrefix.  $oldImageBasename . '.jpg';
-				$newThumbPath = $path . '/' .$thumbnailPrefix.  $newImageBasename . '.jpg';
-
-				if( file_exists( localizePath($oldThumbPath) ) ){
-					
-					// Remove any exising thumbnail by the same name
-					if( file_exists( localizePath($newThumbPath) ) ){
-						fileDelete( localizePath($newThumbPath) );
-					}
-					
-					rename( localizePath($oldThumbPath), localizePath($newThumbPath) );
-				}
-				
-				
-				
-			
-			}else{
-				error('New directory doesn\'t exist');
+			//Remove original if it exists
+			if( file_exists($newPath) ){
+				$id = $newPath;
+				$id = str_replace("/","_",$id);
+				$id = str_replace(".","_",$id);
+				fileDelete($where, $filename, $id);			
 			}
 
+			// Handle any DB records
+			$query = "select * from $GLOBALS[tablePrefix]filesystem where rpath=\"$path\" and filename=\"$id\"";
+			$result = mysql_query($query,$database);
+					
+			if(mysql_num_rows($result) > 0){
+				$newId = str_replace("/","_",$newPath);
+				$newId = str_replace(".","_",$newId);
+
+				$query = "update $GLOBALS[tablePrefix]filesystem set rpath=\"$where\", filename=\"$newId\" where rpath=\"$path\" and filename=\"$id\" ";
+				mysql_query($query,$database);
+				logAction('fileMove', 'Updating metadata');
+			}
+
+			// Rename file
+			rename($filePath, $newPath);
+			
+			// Thumbnail
+			$tmp = explode('.', $filename);
+			$oldImageExtension = array_pop($tmp);
+			$oldImageBasename = implode('.', $tmp);
+
+			$tmp = explode('.', $newName);
+			$newImageExtension = array_pop($tmp);
+			$newImageBasename = implode('.', $tmp);
+
+			$oldThumbPath = $path . '/'.$thumbnailPrefix.$oldImageBasename.'.'.$oldImageExtension.'.jpg';
+			$newThumbPath = $path . '/'.$thumbnailPrefix.$newImageBasename.'.'.$oldImageExtension.'.jpg';
+
+			if( file_exists($oldThumbPath) ){
+				
+				// Remove any exising thumbnail by the same name
+				if( file_exists($newThumbPath) ){
+					fileDelete($newThumbPath);
+				}
+				
+				rename($oldThumbPath, $newThumbPath);
+			}
+
+		}else{
+			error('New directory doesn\'t exist');
 		}
 	}
 }
@@ -1312,19 +1508,21 @@ function fileMove($path, $filename, $id, $where){
 function getMeta($path, $filename, $id, $rtn = false){
 	global $database;
 
-	$filePath = localizePath($path) . '/' . $filename;
-	if( file_exists( localizePath($filePath) ) ){
+	$filePath = $path. '/' . $filename;
+
+	if( file_exists( $filePath ) ){
 		
-		logAction('getMeta', $filePath);
-		jsonStart();
-		
+		if(!$rtn){
+			jsonStart();
+		}
+
 		$stats = stat($filePath);
 		$date = date('M/j/Y h:i', $stats[9]);
-		
+
 		if($date == 'Dec/31/1969 07:00'){
 			$date = 'unknown';
 		}
-		
+
 		$size = round( ($stats[7])/1000, 2 ) . 'KB';
 		$flag = null;
 		$description = null;
@@ -1336,14 +1534,11 @@ function getMeta($path, $filename, $id, $rtn = false){
 				$description = $row['description'];
 			}
 		}
-		
 
 		$file = explode('.', $filename);
 		if( count($file) > 1 ){ // Handle no extension
 			$extension = strtolower( array_pop($file) );
-			
-			
-			
+
 			if( $extension === 'jpg' || 
 					$extension === 'jpeg' || 
 					$extension === 'gif' || 
@@ -1351,20 +1546,19 @@ function getMeta($path, $filename, $id, $rtn = false){
 					$extension === 'pdf' ){
 				$image = true;
 			}
-			
 		}
-		
+
 		$extension = array_pop($file);
 		$filenameBase = implode('.', $file);
-		
+
 		if($rtn){
 			return array('filename'=>$filename, 'date'=>$date, 'size'=>$size, 'path'=>$path, 'image'=>$image, 'flag'=>$flag, 'description'=>$description);
 		}
 
-
-		jsonAdd("\"edit\": true");
+		jsonAdd("\"edit\": true"); // FIXME: ???
 		jsonAdd("\"filename\": \"$filename\", \"date\": \"$date\", \"size\": \"$size\", \"path\": \"$path\", \"image\": \"$image\", \"flag\": \"$flag\", \"description\": \"$description\"");
 		echo jsonReturn('getMeta');
+		
 	}else{
 		error('File doesn\'t exist: ' . $filePath);
 	}
@@ -1374,16 +1568,20 @@ function getMeta($path, $filename, $id, $rtn = false){
 function setMeta($path, $filename, $id, $description, $flags){
 	global $database;
 	
+	if( !permForPath($path, 'write') ){
+		jsonStart();
+		error('You do not have permission for this action.');
+		return false;
+	}
+	
 	$filename 	 = mysql_escape_string($filename);
 	$path    	 = mysql_escape_string($path);
 	$description = mysql_escape_string($description);
 	$flags 		 = mysql_escape_string($flags);
 	$id 		 = mysql_escape_string($id);
 	
-	$filePath = localizePath($path) . '/' . $filename;
-	if( file_exists( localizePath($filePath) ) ){
-	    if(getUserAuth('metaEdit',$path)){
-	
+	$filePath = $path. '/' . $filename;
+	if( file_exists($filePath) ){
 			$query = "select * from $GLOBALS[tablePrefix]filesystem where rpath=\"$path\" and filename=\"$id\"";
 			$result = mysql_query($query,$database);
 
@@ -1412,7 +1610,7 @@ function setMeta($path, $filename, $id, $description, $flags){
 				$query = "insert into $GLOBALS[tablePrefix]filesystem set filename=\"$id\",path=\"\",rpath=\"$path\",type=\"\",size=\"\", status=\"\", description=\"$description\",flags=\"$flags\"";
 				mysql_query($query,$database);
 			}
-		}
+			
 	}
 }
 
@@ -1425,68 +1623,78 @@ function setMeta($path, $filename, $id, $description, $flags){
 
 // Searches file & folder names for partial matches of search terms
 function search($terms){
-	global $thumbnailPrefix;
-	
+	// TODO: add metadata description search too.
+	global $thumbnailPrefix, $database;
 	$terms = mysql_escape_string($terms);
 	$terms = explode(' ', $terms);
-
-	// TODO: add metadata description search too.
 	
-	$filestructure = directoryToArray('filestore', true);
 	jsonStart();
-	$results = 0;
 	
-	// For every file...
-	foreach ($filestructure as $item) {
-
-		$name = $item['name'];
-		$type = $item['type'];
-		$path = '/' . $item['path'];
-		$image = false;
-
+	$results = 0;
+			
+	// Get all virt. dirs 
+	$query = "select * from $GLOBALS[tablePrefix]clients";
+	$response = mysql_query($query, $database);
+	
+	// Add virt. dir paths to an array
+	$dirs = array();
+	while( $client = mysql_fetch_assoc($response) ){
+		$folder = $client['path'].'/'.$client['name'];
 		
-		// Check if any of the terms fall into the file name
-		$present = false;
-		foreach($terms as $term){
-			$pos = strpos(strtolower($name), strtolower($term));
-			if($pos !== false){
-				$present = true;	
-			}
-		}
-
-		// Check if file is hidden (.*)
-		$hidden = false;
-		if( startsWith($name, '.') ||  startsWith($name, $thumbnailPrefix)){
-			$hidden = true;
-		}
-
-		// Add files to JSON
-		if($present && !$hidden){
-			
-			$id = $path . '/' . $name;
-			$id = str_replace("/","_",$id);
-			$id = str_replace(".","_",$id);
-					
-			$metadata = getMeta($path, $name, $id, true);
-			
-			$image = ($metadata['image'] == 1)?true:false;
-			logAction('metadata', $image);
-
-			$date = $metadata['date'];
-			logAction('metadata', $date );
-
-			$description = $metadata['description'];
-			logAction('metadata', $description);
-
-			$flags = ($metadata['flags'] == '')?'normal':$metadata['flags'];
-			logAction('metadata',$flags  );
-
-					
-			jsonAdd("\"rank\":\"$results\",\"image\": \"$image\",\"type\": \"$type\", \"path\": \"$path\",\"description\": \"$description\",\"name\": \"$name\",\"date\":\"$date\", \"id\": \"$id\",\"flags\": \"$flags\"");
-			$results ++;
-		}
+		// Only provide virtual dirs we have access to.
+		if( permForPath($folder, 'read') ){
+			$dirs[] = $folder;
+		}	
 	}
 	
+	// Remove any nested virt. directories 
+	$conDirs = condensePathsArray($dirs);
+
+	// Each virt. directory
+	foreach($conDirs as $folder){
+		
+		// For every file in virt. dir	
+		$filestructure = directoryToArray($folder, true);
+		foreach ($filestructure as $item) {
+	
+			$name = $item['name'];
+			$type = $item['type'];
+			$path = $item['path'];
+			$image = false;
+	
+			// Check if any of the terms fall into the file name
+			$present = false;
+			foreach($terms as $term){
+				$pos = strpos(strtolower($name), strtolower($term));
+				if($pos !== false){
+					$present = true;
+				}
+			}
+	
+			// Check if file is hidden (.*)
+			$hidden = false;
+			if( startsWith($name, '.') ||  startsWith($name, $thumbnailPrefix)){
+				$hidden = true;
+			}
+	
+			// Add files to JSON
+			if($present && !$hidden){
+				$id = $path . '/' . $name;
+				$id = str_replace("/","_",$id);
+				$id = str_replace(".","_",$id);
+	
+				$metadata = getMeta($path, $name, $id, true);
+				$image = ($metadata['image'] == 1)?true:false;
+				$date = $metadata['date'];
+				$description = $metadata['description'];
+				$flags = ($metadata['flags'] == '')?'normal':$metadata['flags'];
+
+				jsonAdd("\"rank\":\"$results\",\"image\": \"$image\",\"type\": \"$type\", \"path\": \"$path\",\"description\": \"$description\",\"name\": \"$name\",\"date\":\"$date\", \"id\": \"$id\",\"flags\": \"$flags\" ");
+				$results ++;
+			}
+		}
+	}
+
 	if($results > 0){
 		echo jsonReturn('search');
 	}
@@ -1497,6 +1705,111 @@ function search($terms){
 
 // Login & Permissions Methods
 // ***************************************************************************
+
+function sortByLength($a,$b){
+	// Longest first
+	return strlen($b)-strlen($a);
+}
+
+// Returns array of virtual directories
+function getVirtualDirs(){
+	global $database;
+
+	$query = "select * from $GLOBALS[tablePrefix]clients";
+	$response = mysql_query($query, $database);
+		
+	$dirs = array();
+	while( $client = mysql_fetch_assoc($response) ){
+		$folder = $client['path'].'/'.$client['name'];
+		$dirs[] = $folder;
+	}
+	
+	return $dirs;
+}
+
+function getVirtualDirID($path){
+	global $database;
+	
+	$candidates = array();
+	$virDirs = getVirtualDirs();
+	
+	logAction('getVDiD', $path);
+	
+	foreach($virDirs as $virPath){
+		if( startsWith($path, $virPath) ){
+			$candidates[] = $virPath;
+			logAction('getVDiD pos', $virPath);
+			
+		}
+	}
+
+	// Longest virtual dir 
+	usort($candidates,'sortByLength');
+
+	$virtualFullPath = $candidates[0];
+	$virtualFullPath = explode('/', $virtualFullPath); 	// /var/www/pics
+	$virtualName = array_pop($virtualFullPath); 		// pics
+	$virtualPath = implode('/', $virtualFullPath); 		// /var/www
+
+	$query = "select * from $GLOBALS[tablePrefix]clients where path=\"$virtualPath\" and name=\"$virtualName\" ";
+	$response = mysql_query($query, $database);
+		
+	$id = 0;
+	
+	while( $client = mysql_fetch_assoc($response) ){
+		$id = $client['id'];
+	}
+	
+	return $id;
+}
+
+function permForPath($path, $action){
+	global $database;
+	
+	$virtualDirID = getVirtualDirID($path);
+	
+	logAction('perm vID', $virtualDirID);
+	
+	$userID = $_SESSION[userid];
+	logAction('perm uID', $virtualDirID);
+	
+	
+	$query = "select * from $GLOBALS[tablePrefix]permissions where userid=\"$userID\" and clientid=\"$virtualDirID\" ";
+	$response = mysql_query($query, $database);
+		
+	$scheme = '';
+	
+	if (!$response){
+
+	}else{
+		while( $client = mysql_fetch_assoc($response) ){
+			$scheme = $client['scheme'];
+		}		
+	}
+	
+	if($action == 'write'){
+		if($scheme == 'admin' || $scheme == 'write'){
+			return true;
+		}
+	}else if($action == 'read'){
+		if($scheme == 'admin' || $scheme == 'write' || $scheme == 'read'){
+			return true;
+		}
+	}
+		
+	return false;
+}
+
+
+
+
+
+
+
+
+
+
+
 
 // Legacy Method
 function checkLogin(){
@@ -1628,8 +1941,8 @@ function userPermissions(){
 
 // Legacy Method
 function getUserAuth($type,$path){
-	logAction('getUserAuth','');	
-	logAction($type,$path);
+	// logAction('getUserAuth','');	
+	// logAction($type,$path);
 	
 	if(isset($_SESSION['userid'])){
 		
