@@ -446,6 +446,12 @@ function getFilePackage($paths, $returnContent = false){
 // Upload Methods
 // ***************************************************************************
 
+
+
+
+
+
+
 // Legacy Method
 function upload($dir){
 	
@@ -474,13 +480,12 @@ function upload($dir){
 	}
 }
 
-// Legacy Method
 function uploadAuth($path){
 	global $uploadDir;
 	$path = mysql_escape_string($path);
 	jsonStart();
 	
-	if(getUserAuth('upload',$path)){
+	if( permForPath($path, 'write') ){ 
 		$userpath = getUserPath($path).$path;
 		if(is_dir($userpath)){
 			$_SESSION['uploadPath'] = $path;
