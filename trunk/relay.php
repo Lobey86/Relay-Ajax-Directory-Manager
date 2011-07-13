@@ -446,30 +446,27 @@ function getFilePackage($paths, $returnContent = false){
 // Upload Methods
 // ***************************************************************************
 
-
-
-
-
-
-
 // Legacy Method
 function upload($dir){
 	
+	logAction('upload','!!!!!!!!!!!!!!!!!!!!!');
+	
 	if( permForPath($dir, 'write') ){
 		
-		if(getUserAuth('upload',$dir)){
-			$userpath = getUserPath($dir).$dir;
+		$userpath = $dir;
 
-			$tmp_name = $_FILES["upload"]["tmp_name"];
-			$uploadfile = basename($_FILES['upload']['name']);
-			$i=1;
-			while(file_exists($userpath.'/'.$uploadfile)){
-			    $uploadfile = $i . '_' . basename($_FILES['upload']['name']);
-			    $i++;
-			}
+		
 
-			move_uploaded_file($tmp_name, $userpath.'/'.$uploadfile);
+		$tmp_name = $_FILES["upload"]["tmp_name"];
+		$uploadfile = basename($_FILES['upload']['name']);
+		$i=1;
+		while(file_exists($userpath.'/'.$uploadfile)){
+		    $uploadfile = $i . '_' . basename($_FILES['upload']['name']);
+		    $i++;
 		}
+
+		move_uploaded_file($tmp_name, $userpath.'/'.$uploadfile);
+
 
 		if(isset($_GET['redir'])){
 			header("location: $_GET[redir]");
@@ -480,19 +477,27 @@ function upload($dir){
 	}
 }
 
+// Legacy Method
 function uploadAuth($path){
 	global $uploadDir;
 	$path = mysql_escape_string($path);
 	jsonStart();
 	
-	if( permForPath($path, 'write') ){ 
-		$userpath = getUserPath($path).$path;
+	if( permForPath($path, 'write') ){
+		$userpath = $path;
+		
 		if(is_dir($userpath)){
+			
 			$_SESSION['uploadPath'] = $path;
-		if(file_exists($uploadDir."stats_".session_id().".txt"))
-			unlink($uploadDir."stats_".session_id().".txt");
-		if(file_exists($uploadDir."temp_".session_id()))
-			unlink($uploadDir."temp_".session_id());
+			
+			if(file_exists($uploadDir."stats_".session_id().".txt")){
+				unlink($uploadDir."stats_".session_id().".txt");
+			}
+			
+			if(file_exists($uploadDir."temp_".session_id())){
+				unlink($uploadDir."temp_".session_id());
+			}
+			
 			jsonAdd("\"auth\":\"true\",\"sessionid\":\"".session_id()."\"");
 		}else{
 			jsonAdd("\"auth\":\"false\",\"error\":\"bad directory\"");
@@ -647,11 +652,7 @@ function jsonAdd($jsonLine){
 }
 
 function jsonReturn($variableName){
-  global $json;
-
-	logAction('jsonReturn', $json);
-	
-
+  global $json;	
   return "{\"bindings\": [ $json ]}";
 }
 
@@ -1738,12 +1739,10 @@ function getVirtualDirID($path){
 	$candidates = array();
 	$virDirs = getVirtualDirs();
 	
-	logAction('getVDiD', $path);
 	
 	foreach($virDirs as $virPath){
 		if( startsWith($path, $virPath) ){
 			$candidates[] = $virPath;
-			logAction('getVDiD pos', $virPath);
 			
 		}
 	}
@@ -1773,10 +1772,8 @@ function permForPath($path, $action){
 	
 	$virtualDirID = getVirtualDirID($path);
 	
-	logAction('perm vID', $virtualDirID);
 	
 	$userID = $_SESSION[userid];
-	logAction('perm uID', $virtualDirID);
 	
 	
 	$query = "select * from $GLOBALS[tablePrefix]permissions where userid=\"$userID\" and clientid=\"$virtualDirID\" ";

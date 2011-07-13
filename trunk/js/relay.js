@@ -1607,8 +1607,6 @@ function newFolder(){
 uploadDestination = null
 
 function uploadAuth() {
-	console.log()
-
 	
 	if(QFiles.length == 0) return false;
 	if(!FC.SELECTEDOBJECT) { return false;}
@@ -1636,8 +1634,6 @@ function uploadAuth() {
 
 function uploadAuth_handler(response) {
 	var json_data = response.responseText; 
-
-	console.log('suc');
 	
 	var jsonObject = jQuery.parseJSON(json_data)
 	
@@ -1650,6 +1646,8 @@ function uploadAuth_handler(response) {
 }
 
 function sendUpload(sid) {
+	
+	
 		var uploadDumb = FC.UPLOADURL + '?'+ sid;
 		$('uploadForm').action = uploadDumb;
 		$('uploadForm').submit();
