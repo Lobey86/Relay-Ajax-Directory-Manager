@@ -684,10 +684,10 @@ Directory.prototype = {
 			if(Element.hasClassName( $(event.target), 'dropdown') ){
 				return;
 			};
-		};
+		}; 
 		
-		$('uploadPath').value = this.path;
-		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.path;
+		$('uploadPath').value = this.fullPath;
+		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.fullPath;
 		// this.del.style.display = "block";
 		// this.newFolder.style.display = "block";
 		this.dropdown.style.display = "block";
@@ -1142,8 +1142,8 @@ File.prototype = {
 		
 
 		
-		$('uploadPath').value = this.parentObject.path;
-		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.parentObject.path;
+		$('uploadPath').value = this.parentObject.fullPath;
+		$('uploadstatus').innerHTML = "<em>Destination</em> "+this.parentObject.fullPath;
 		this.dropdown.style.display = "block";
 		// this.del.style.display = this.dl.style.display = "block";
 		if(FC.SELECTEDOBJECT != null && FC.SELECTEDOBJECT != this) FC.SELECTEDOBJECT.deselect(); 
@@ -1607,21 +1607,37 @@ function newFolder(){
 uploadDestination = null
 
 function uploadAuth() {
+	console.log()
 
 	
 	if(QFiles.length == 0) return false;
 	if(!FC.SELECTEDOBJECT) { return false;}
 	
-	if(FC.SELECTEDOBJECT.type == 'file') uploadDestination = FC.SELECTEDOBJECT.parentObject;
-	else uploadDestination = FC.SELECTEDOBJECT;	
+	if(FC.SELECTEDOBJECT.type == 'file') {
+		uploadDestination = FC.SELECTEDOBJECT.parentObject;
+	}else{
+		uploadDestination = FC.SELECTEDOBJECT;	
+	}
+		
+	var params = $H({
+		relay: 'uploadAuth', 
+		path: uploadDestination.fullPath
+	});
 	
-	var params = $H({ relay: 'uploadAuth', path: uploadDestination.path });
-	var ajax = new Ajax.Request(FC.URL,{ onSuccess: uploadAuth_handler, method: 'post', parameters: params.toQueryString(), onFailure: function() { showError(ER.ajax); } });	
+	var ajax = new Ajax.Request(FC.URL,{ 
+		onSuccess: uploadAuth_handler, 
+		method: 'post', 
+		parameters: params.toQueryString(), 
+		onFailure: function() {
+			showError(ER.ajax);
+		} 
+	});	
 }
 
 function uploadAuth_handler(response) {
 	var json_data = response.responseText; 
-//	eval("var jsonObject = ("+json_data+")");
+
+	console.log('suc');
 	
 	var jsonObject = jQuery.parseJSON(json_data)
 	
