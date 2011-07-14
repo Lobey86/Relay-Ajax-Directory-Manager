@@ -99,10 +99,9 @@ div#dashboard {
 
 <div id="dashboard">
 	<div style="position:relative;">
-		<img src="images/uploadtitle.gif" class="label" alt="Upload" onclick="Element.toggle('uploadcart'); Element.toggle('uploadcartclose');" />
-		<div id="uploadcartclose" style="display:none; position:absolute; top:3px; right:5px; color:#333; cursor:pointer;" onclick="Element.toggle('uploadcart'); Element.toggle('uploadcartclose');"><img src="images/close.gif" /></div>
+		<img src="images/uploadtitle.gif" class="label" alt="Upload" style="cursor:auto;" />
 	</div>
-	<div id="uploadcart" style="display:none;">
+	<div id="uploadcart">
 		
 		<div id="uploadstatus"><em>Destination</em> select a folder</div>
 		
@@ -143,6 +142,7 @@ div#dashboard {
 				<div id="carthelper">Drag files here</div>
 			</div>
 			<div id="cartbtn">
+
 				<img src="images/emailto.jpg" class="emailto" onclick="cart.showEmail(); return false" alt="Email To" />
 				<img src="images/download.jpg" class="downloadsubmit" onclick="cart.download(); return false" alt="Download Cart" />
 		
@@ -151,7 +151,7 @@ div#dashboard {
 					<tr><td>To:</td><td><input type="text" id="emailFormTo" value="Type email address" /></td></tr>
 					<tr><td>From:</td><td><input type="text" id="emailFormFrom" value="Type your email address" /></td></tr>
 					<tr><td></td><td><textarea id="emailFormMessage">Type Message here</textarea></td></tr>
-					<tr><td> <td align="right"><img src="images/sendEmail.jpg" alt="Send Email" onclick="cart.download()" /></td></tr>
+					<tr><td> <td align="right"><img src="images/sendEmail.jpg" alt="Send Email" onclick="cart.email()" /></td></tr>
 				</table>
 				<div id="emailconfirm" style="display:none; text-align:center;">Email Sent</div>
 			</div>

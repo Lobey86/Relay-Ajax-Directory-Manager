@@ -2112,6 +2112,7 @@ windowLoader = function () {
 	var ajax = new Ajax.Request('relay.php', {onSuccess: userLogin_handler_check, method: 'post', parameters: 'relay=checkLogin'});
 
 	massAction();
+ 
 }
 
 window.onload = windowLoader;
