@@ -1210,7 +1210,7 @@ function folderIsDeletable($path, $rtn = false){
 		foreach ($filestructure as $item) {
 			$name = $item['name'];
 			$type = $item['type'];
-			$path = '/' . $item['path'];
+			$path = $item['path'];
 
 			if( !fileIsWritable($path .'/'. $name, true) ){
 				$writable = false;
@@ -1736,9 +1736,11 @@ function getVirtualDirs(){
 function getVirtualDirID($path){
 	global $database;
 	
+	logAction('vid q in', $path);
+	
+	
 	$candidates = array();
 	$virDirs = getVirtualDirs();
-	
 	
 	foreach($virDirs as $virPath){
 		if( startsWith($path, $virPath) ){
@@ -1756,6 +1758,9 @@ function getVirtualDirID($path){
 	$virtualPath = implode('/', $virtualFullPath); 		// /var/www
 
 	$query = "select * from $GLOBALS[tablePrefix]clients where path=\"$virtualPath\" and name=\"$virtualName\" ";
+
+	logAction('vid query', $query);
+
 	$response = mysql_query($query, $database);
 		
 	$id = 0;
@@ -1772,8 +1777,11 @@ function permForPath($path, $action){
 	
 	$virtualDirID = getVirtualDirID($path);
 	
+	logAction('perm_vID',$virtualDirID);
 	
 	$userID = $_SESSION[userid];
+	
+	logAction('perm_uID',$userID);
 	
 	
 	$query = "select * from $GLOBALS[tablePrefix]permissions where userid=\"$userID\" and clientid=\"$virtualDirID\" ";
@@ -1788,6 +1796,9 @@ function permForPath($path, $action){
 			$scheme = $client['scheme'];
 		}		
 	}
+	
+	logAction('perm_scheme',$scheme);
+	
 	
 	if($action == 'write'){
 		if($scheme == 'admin' || $scheme == 'write'){

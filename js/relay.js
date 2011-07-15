@@ -853,15 +853,22 @@ Directory.prototype = {
 			});
 			
 			this.parentObject.prevChild(this);
-			
+			var xxx = this;
 			var ajax = new Ajax.Request(FC.URL,{
 				onComplete: this.parentObject.nextChild(this),
-				onSuccess: this.clear.bind(this),
+				onSuccess: function(xxx){			
+					self.clear.bind(self);
+				},
 				method: 'post', 
 				parameters: params.toQueryString(), 
 				onFailure: function() { showError(ER.ajax); }
 			});
 		}
+	},
+	
+	folderDelete_handler: function(response){
+		console.log('response')
+
 	},
 	
 	addBlank: function() {
