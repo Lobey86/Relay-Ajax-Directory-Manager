@@ -5,19 +5,6 @@ if (typeof console == "undefined") {
     };
 }
 
-
-// 
-// $file1 = $srcImagePath;
-// $file2 = $srcImagePath .'temp';
-// $code = "$ghostScript -q -dNOPAUSE -dBATCH -dFirstPage=1 -dLastPage=1 -sDEVICE=jpeg -sOutputFile=\"$file2\" \"$file1\" 2>&1";
-// 
-// $result1 = @exec($code);
-// 
-// $src_img=imagecreatefromjpeg($file2);
-// 
-// $deletefile = $file2;
-//// Copyright (c) 2006 Chris Iufer & David Barshow (http://ecosmear.com/relay)
-
 var FC = {
 	URL: 'relay.php',
 	TYPES: new Array('file','directory'),
@@ -30,12 +17,6 @@ var FC = {
 	UPLOADURL: 'upload.pl',
 	DEBUG:false
 };
-
-
-
-
-
-
 
 // TODO: Directory and File should *ideally* be subclasses of the same class 
 // since they share so much similar functionality.
@@ -866,10 +847,7 @@ Directory.prototype = {
 		}
 	},
 	
-	folderDelete_handler: function(response){
-		console.log('response')
 
-	},
 	
 	addBlank: function() {
 		if(this.blankisshowing) return false;
