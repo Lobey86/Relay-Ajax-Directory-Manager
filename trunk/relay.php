@@ -899,7 +899,7 @@ function getFolder($path){
 
 				if($file != '.' && $file != '..'){
 
-					if(filetype($fullpath . '/' . $file) == 'dir'){
+					if(is_dir($fullpath . '/' . $file)){
 						jsonAdd("\"type\": \"directory\", \"name\": \"$file\", \"path\": \"$path\""); 
 					}else{
 						// Ignore hidden .files
