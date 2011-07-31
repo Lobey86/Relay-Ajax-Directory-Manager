@@ -829,12 +829,19 @@ function getFolder($path){
 	// Get virtual directories ===============================================
 	if($path == '' || $path == '/'){
 
+		/*
+		 * Legacy code weirdness.
+		 * Explicitly filtered out all v.dirs not named same as user.
+		 * Then explicitly filtered out v.dirs named same as user.
+		 */
 		// Get permissions for folders?
-		$query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" and $GLOBALS[tablePrefix]clients.name =\"$_SESSION[user]\" order by display";
-		$result = mysql_query($query,$database);
-
-		// ????
-		$query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" and $GLOBALS[tablePrefix]clients.name !=\"$_SESSION[user]\" order by display";
+		// $query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" and $GLOBALS[tablePrefix]clients.name =\"$_SESSION[user]\" order by display";
+		// $result = mysql_query($query,$database);
+		// ???
+		// $query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" and $GLOBALS[tablePrefix]clients.name !=\"$_SESSION[user]\" order by display";
+		// $result = mysql_query($query,$database);
+		
+		$query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" order by display";
 		$result = mysql_query($query,$database);
 		
 		$vdcount = mysql_num_rows($result);
@@ -847,16 +854,13 @@ function getFolder($path){
 				$virtual = "false";
 			}
 			
-			while($clients = mysql_fetch_assoc($result)) { 
-				
-				
+			while($clients = mysql_fetch_assoc($result)){ 
 				$displayName = $clients[display];
 				$scheme = $clients[scheme];
 				$name = $clients[name];
 								
 				$q = "select * from $GLOBALS[tablePrefix]clients where name=\"$name\" ";
 				$res = mysql_query($q, $database);
-				
 				$path = '';
 				
 				while( $c = mysql_fetch_assoc($res) ){
@@ -864,7 +868,6 @@ function getFolder($path){
 				}
 				
 				$output .=  jsonAdd("\"displayname\":\"$displayName\",\"scheme\":\"$scheme\",\"type\": \"directory\", \"name\": \"$name\", \"path\": \"$path\",\"virtual\":\"$virtual\"");
-
 			}
 		}
 		$output .= jsonReturn('getFolder');
@@ -905,7 +908,7 @@ function getFolder($path){
 							// id is only for providing the HTML elements a unique id.
 							$id = str_replace("/","_",($path . '/' . $file));
 							$id = str_replace(".","_",$id);
-							// FIXME: inputting bullshit flags
+							// Folders don't use flags or date but client side expects the key:values anyway. - future implementation?
 							jsonAdd("\"id\": \"$id\", \"path\":\"$path\", \"type\": \"file\", \"name\": \"$file\",\"date\":\"\",\"flags\": \"normal\"");
 						}
 					}

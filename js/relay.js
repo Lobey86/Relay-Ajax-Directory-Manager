@@ -15,7 +15,8 @@ var FC = {
 	NEXTPATH: null,
 	AJAXCALL: 0,
 	UPLOADURL: 'upload.pl',
-	DEBUG:false
+	DEBUG:false,
+	vDirsLoaded:false
 };
 
 // TODO: Directory and File should *ideally* be subclasses of the same class 
@@ -339,7 +340,6 @@ Directory.prototype = {
 	},
 	
 	getContents: function () {
-
 		if(this.opening) return false;
 		this.opening = true;
 		var params = $H({ relay: 'getFolder', path: this.fullPath });
@@ -418,7 +418,11 @@ Directory.prototype = {
 			parsePath(FC.NEXTPATH);
 		};
 		
-	
+		
+		if(!FC.vDirsLoaded){
+			root.children[0].select();
+			FC.vDirsLoaded = true;
+		}
 	},
 	
 	
@@ -2084,8 +2088,7 @@ function userLogin_handler_check(response){
 
 windowLoader = function () { 
 	root = new Directory('', '', false, $('fileList'));
-	
-	root.getContents();
+	root.getContents();	
 	getQuery('path');
 	
 	new UploadManager('fileUpload');
