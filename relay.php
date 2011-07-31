@@ -834,7 +834,7 @@ function getFolder($path){
 		 * Explicitly filtered out all v.dirs not named same as user.
 		 * Then explicitly filtered out v.dirs named same as user.
 		 */
-		// Get permissions for folders?
+		// ???
 		// $query = "select * from $GLOBALS[tablePrefix]permissions inner join $GLOBALS[tablePrefix]clients on $GLOBALS[tablePrefix]permissions.clientid=$GLOBALS[tablePrefix]clients.id where userid=\"$_SESSION[userid]\" and $GLOBALS[tablePrefix]clients.name =\"$_SESSION[user]\" order by display";
 		// $result = mysql_query($query,$database);
 		// ???
