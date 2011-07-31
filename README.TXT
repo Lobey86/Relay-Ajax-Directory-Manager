@@ -6,7 +6,7 @@ ghostscript, unzip, and mod-perl2.
 On a debian or debian derivative:
 
 sudo apt-get update
-sudo apt-get install apache2 mysql-server php5 php5-gd imagemagick gs-common unzip libabpache2-mod-perl2
+sudo apt-get install apache2 mysql-server php5 php5-gd imagemagick gs-common unzip libapache2-mod-perl2
 
 
 *** MYSQL DATABASE ***
