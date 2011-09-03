@@ -193,6 +193,7 @@ a.hot {
 	top:0;
 	left:38px;
 	cursor:default;
+	z-index:99;
 }
 .link {
 	display:block;
@@ -274,7 +275,21 @@ a.hot {
 #meta textarea {
 	width:115px; 
 }
-#cart, #uploadQ {
+
+#cart{
+	max-height:150px;
+	overflow:auto;
+/*	overflow-x:hidden; 
+	overflow-y:scroll;"	*/
+	/*float:left;*/
+	width:180px;
+	min-height:28px;
+	border:1px solid rgb(214,214,214);
+	background:white;
+	margin-bottom:5px;
+}
+
+#uploadQ {
 	width:180px;
 	min-height:28px;
 	border:1px solid rgb(214,214,214);
@@ -290,18 +305,22 @@ a.hot {
 	border-collapse:collapse;
 	margin:4px 0 0 0;
 }
-#cart div {float:left; height:20px;}
-#cart div div{
-	margin:0;
-	width:145px;
-	overflow:hidden;
-}
-#cart {float:left;}
 #cart div {
+	float:left;
+	height:30px;
+	width:146px;
+	overflow:hidden;
 	margin:4px 0 0 9px;
 }
+#cart div div{
+	margin:0;
+	width:125px;
+	overflow:hidden;
+}
+
+
 #cart .remove {
-	float:left;
+	float:right;
 	display:block;
 	width:12px;
 	height:12px;
