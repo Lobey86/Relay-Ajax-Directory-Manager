@@ -39,7 +39,6 @@ pane. -->
 
 <style type="text/css">
 	@import url(css/relay.css);
-	@import url(css/login.css);
 </style>
 <style type="text/css">
 #dashboard {
@@ -183,8 +182,6 @@ div#dashboard {
 
 
 <div id="login" style="display:none">
-	<img src="images/login_bg.png" alt="" class="bg" />
-	<img src="images/logo.gif" alt="Relay beta 1.0" class="logo" />
 	<form onsubmit="userLogin(); return false" >
 		<div class="username">
 			<span>Username</span><input size="20" type="text" name="username" value="" id="username" />
@@ -192,7 +189,6 @@ div#dashboard {
 		<div class="password">
 			<span>Password</span><input size="20" type="password" name="password" onkeypress="return submitenter(this,event)" value="" id="password" />
 		</div>
-		<img src="/images/login.jpg" onclick="userLogin()" alt="Login" class="login" />
 	</form>
 	<div class="warning" id="warning">
 		Sorry you don't have authorization to use this application, please try logging in again.
