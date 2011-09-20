@@ -1886,13 +1886,15 @@ Cart.prototype = {
 		for(var i=0; i < this.children.length; i++) {
 			if(this.children[i] != ''){
 				cartIDs += this.children[i];
-				if(i != this.children.length-1) cartIDs += ',';
+				if(i != this.children.length-1) cartIDs += '\\\\,';
 			}
 		}
 		for(var i=0;i< this.children.length; i++){ 
 			Element.remove('c'+this.children[i]);
 		}
 		this.children = new Array();
+		
+		console.log(cartIDs);
 		
 		return cartIDs;
 	},

@@ -358,7 +358,7 @@ function emailFilePackage($paths,$to,$from,$message){
 	
 	
 	
-		$fileids = preg_split("/\,/",$fileids);
+		$fileids = explode("\\\\,",$fileids);
 	
 		$boundary = "DU_" . md5(uniqid(time()));	
 		$headers = "From: $from". "\r\n";
@@ -404,7 +404,7 @@ function getFilePackage($paths, $returnContent = false){
 	
 	logAction('getFilePackage', $paths);
 	
-	$paths = preg_split("/\,/",$paths);
+	$paths = explode("\\\\,",$paths);
 	
 	$files = array();
 	$fileCount = 0;
