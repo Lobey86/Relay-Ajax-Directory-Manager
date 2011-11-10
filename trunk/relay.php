@@ -855,11 +855,11 @@ function getFolder($path){
 			}
 			
 			while($clients = mysql_fetch_assoc($result)){ 
-				$displayName = $clients[display];
-				$scheme = $clients[scheme];
-				$name = $clients[name];
+				$displayName = $clients['display'];
+				$scheme = $clients['scheme'];
+				$name = $clients['name'];
 								
-				$q = "select * from $GLOBALS[tablePrefix]clients where name=\"$name\" ";
+				$q = "select * from $GLOBALS[tablePrefix]clients where id=" . $clients[id];
 				$res = mysql_query($q, $database);
 				$path = '';
 				
@@ -1690,7 +1690,7 @@ function permForPath($path, $action){
 	global $database;
 	
 	$virtualDirID = getVirtualDirID($path);
-	$userID = $_SESSION[userid];
+	$userID = $_SESSION['userid'];
 	$query = "select * from $GLOBALS[tablePrefix]permissions where userid=\"$userID\" and clientid=\"$virtualDirID\" ";
 	$response = mysql_query($query, $database);
 	$scheme = '';
